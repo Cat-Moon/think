@@ -1,6 +1,42 @@
 // ClaudeCodeProvider：通过本机已登录的 Claude Code CLI 调用（设计文档第 8.1 节）。
 import { parseStream, printArgs, runClaude, type RunResult } from "../claude-cli";
-import { ERROR_TEXT, ZERO_USAGE, type AgentProvider, type LLMErrorKind, type LLMRequest, type LLMResponse, type ProviderStatus, type Usage } from "./provider";
+import { ERROR_TEXT, ZERO_USAGE, type AgentProvider, type LLMErrorKind, type LLMRequest, type LLMResponse, type Progress, type ProviderStatus, type Usage } from "./provider";
+
+/**
+ * 把 --include-partial-messages 的 stream_event 变成进度：thinking_delta → 思考中，
+ * text_delta / input_json_delta → 正在写。流式片段未经校验，只用来显示进度；结果仍以 result 行为准。
+ * 同一阶段内最多每 250ms 报告一次。
+ */
+export function progressTracker(report: (p: Progress) => void, now: () => number = Date.now) {
+  let phase: Progress["phase"] = "waiting";
+  let chars = 0;
+  let lastAt = 0;
+  return (line: string) => {
+    if (!line.includes('"stream_event"')) return;
+    let m: { type?: string; event?: { type?: string; delta?: Record<string, unknown> } };
+    try {
+      m = JSON.parse(line) as typeof m;
+    } catch {
+      return;
+    }
+    const delta = m.type === "stream_event" && m.event?.type === "content_block_delta" ? m.event.delta : undefined;
+    if (!delta) return;
+    const piece = delta.type === "thinking_delta" ? delta.thinking : delta.type === "text_delta" ? delta.text : delta.type === "input_json_delta" ? delta.partial_json : undefined;
+    if (typeof piece !== "string") return;
+    const next: Progress["phase"] = delta.type === "thinking_delta" ? "thinking" : "writing";
+    if (next !== phase) {
+      phase = next;
+      chars = 0;
+      lastAt = 0;
+    }
+    chars += piece.length;
+    const t = now();
+    if (t - lastAt >= 250) {
+      lastAt = t;
+      report({ phase, chars });
+    }
+  };
+}
 
 function parseUsage(u: unknown): Usage {
   const x = (u ?? {}) as Record<string, unknown>;
@@ -74,7 +110,9 @@ export class ClaudeCodeProvider implements AgentProvider {
     const t0 = Date.now();
     let run: RunResult;
     try {
-      run = await runClaude(printArgs(req), { stdin: req.prompt, signal: req.signal, timeoutMs: req.timeoutMs });
+      req.onProgress?.({ phase: "waiting", chars: 0 });
+      const onLine = req.onProgress ? progressTracker(req.onProgress) : undefined;
+      run = await runClaude(printArgs({ ...req, partial: Boolean(req.onProgress) }), { stdin: req.prompt, signal: req.signal, timeoutMs: req.timeoutMs, onLine });
     } catch (e) {
       return { ok: false, error: { kind: "not_installed", message: `${ERROR_TEXT.not_installed}：${(e as Error).message}` }, durationMs: Date.now() - t0 };
     }

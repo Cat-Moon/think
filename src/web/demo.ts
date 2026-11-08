@@ -1,5 +1,5 @@
 // M4 用的手写示例数据：用 core 的补丁函数从空图一步步搭出来，保证版本、补丁和拒绝记录都是一致的。
-// M5 接入服务端后，这些状态改为从 Map 文件夹读取。
+// 现在用于测试和 scripts/seed-workspace.ts（生成界面检查用的工作区）。
 import { edgeActionOps, makePatch, resolvePatch, type Choices, type EdgeAction } from "../core/patch";
 import type { Graph, Patch, PatchOp, Version } from "../core/schema";
 import { initialVersion, restoreVersion } from "../core/version";

@@ -10,6 +10,7 @@ import { makePatch } from "../../core/patch";
 import { AiOutput, aiOutputJsonSchema, type Patch, type Turn } from "../../core/schema";
 import { appendJsonl } from "../storage/fsutil";
 import { appendTurn, listPatchIds, nextPatchId, paths, readConversation, readGraph, readPatch, savePatch } from "../storage/map-store";
+import type { TurnProgressEvent } from "../api";
 import { ERROR_TEXT, ZERO_USAGE, addUsage, type AgentProvider, type LLMErrorKind, type Usage } from "./provider";
 import { loadSystemPrompt, type SystemPrompt } from "./system-prompt";
 
@@ -29,6 +30,8 @@ export interface TurnOptions {
   timeoutMs?: number;
   systemPrompt?: SystemPrompt;
   now?: () => string;
+  /** 进度：第几次调用（重试时说明原因），以及 AI 正在思考 / 正在写 */
+  onEvent?: (e: TurnProgressEvent) => void;
 }
 
 export interface AttemptRecord {
@@ -109,7 +112,9 @@ export async function takeTurn(dir: string, provider: AgentProvider, opts: TurnO
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const prompt = buildTurnPrompt({ graph, patches, turns, retryErrors });
+    opts.onEvent?.({ type: "attempt", attempt, ...(retryErrors ? { reason: retryErrors.join("；").slice(0, 200) } : {}) });
     const res = await provider.complete({
+      onProgress: opts.onEvent ? (p) => opts.onEvent!({ type: "progress", attempt, ...p }) : undefined,
       systemPrompt: system.text,
       prompt,
       jsonSchema: aiOutputJsonSchema(),

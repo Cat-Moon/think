@@ -10,6 +10,14 @@ export interface LLMRequest {
   effort?: string;
   signal?: AbortSignal;
   timeoutMs?: number;
+  /** 流式进度（可选）：AI 正在思考 / 正在写输出，以及已收到的字数 */
+  onProgress?: (p: Progress) => void;
+}
+
+export interface Progress {
+  phase: "waiting" | "thinking" | "writing";
+  /** 这一阶段已收到的字符数 */
+  chars: number;
 }
 
 export interface Usage {

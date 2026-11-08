@@ -11,7 +11,7 @@ export function initialVersion(topic: string, now: string): Version {
     nodes: [],
     edges: [],
   };
-  return { version: graph.version, parent_version: null, patch_id: null, decisions: null, created_at: now, graph };
+  return { version: graph.version, parent_version: null, patch_id: null, decisions: null, created_at: now, restored_from: null, graph };
 }
 
 /** 以 parent 为基础生成下一个版本快照（graph 内容由调用方给出） */
@@ -31,7 +31,7 @@ export function nextVersion(
     nodes: content.nodes,
     edges: content.edges,
   });
-  return { version, parent_version: parent.version, patch_id: patchId, decisions, created_at: now, graph };
+  return { version, parent_version: parent.version, patch_id: patchId, decisions, created_at: now, restored_from: null, graph };
 }
 
 /**
@@ -50,7 +50,7 @@ export function restoreVersion(current: Graph, target: Graph, now: string): Vers
   for (const e of current.edges) {
     if (!edgeIds.has(e.id)) edges.push({ ...structuredClone(e), status: "rejected" });
   }
-  return nextVersion(current, { frame: structuredClone(target.frame), nodes, edges }, null, now);
+  return { ...nextVersion(current, { frame: structuredClone(target.frame), nodes, edges }, null, now), restored_from: target.version };
 }
 
 // ---------- 差异 ----------

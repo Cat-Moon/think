@@ -49,7 +49,10 @@ export interface RunResult {
 }
 
 /** 在一个空的临时目录里运行 claude；stdin 写入后关闭；结束后删除临时目录 */
-export function runClaude(args: string[], opts: { stdin?: string; signal?: AbortSignal; timeoutMs?: number } = {}): Promise<RunResult> {
+export function runClaude(
+  args: string[],
+  opts: { stdin?: string; signal?: AbortSignal; timeoutMs?: number; /** stdout 每完整一行调用一次（用于流式显示进度） */ onLine?: (line: string) => void } = {},
+): Promise<RunResult> {
   const { env, removedApiKey } = childEnv();
   const cwd = mkdtempSync(join(tmpdir(), "think-cli-"));
 
@@ -63,7 +66,22 @@ export function runClaude(args: string[], opts: { stdin?: string; signal?: Abort
     let stdout = "";
     let stderr = "";
     let killedBy: RunResult["killedBy"] = null;
-    child.stdout.setEncoding("utf8").on("data", (d: string) => (stdout += d));
+    let pending = "";
+    child.stdout.setEncoding("utf8").on("data", (d: string) => {
+      stdout += d;
+      if (!opts.onLine) return;
+      pending += d;
+      let i: number;
+      while ((i = pending.indexOf("\n")) >= 0) {
+        const line = pending.slice(0, i);
+        pending = pending.slice(i + 1);
+        try {
+          opts.onLine(line);
+        } catch {
+          // 进度回调出错不影响调用本身
+        }
+      }
+    });
     child.stderr.setEncoding("utf8").on("data", (d: string) => (stderr += d));
 
     const kill = (why: "abort" | "timeout") => {
@@ -98,6 +116,8 @@ export interface PrintOptions {
   model: string;
   /** 思考程度：low / medium / high …；不传则用 CLI 默认 */
   effort?: string;
+  /** 输出逐段的 stream_event（--include-partial-messages），用于界面显示"思考中 / 正在写" */
+  partial?: boolean;
 }
 
 /**
@@ -118,6 +138,7 @@ export function printArgs(opts: PrintOptions): string[] {
     "--no-session-persistence",
     "--model", opts.model,
     ...(opts.effort ? ["--effort", opts.effort] : []),
+    ...(opts.partial ? ["--include-partial-messages"] : []),
   ];
 }
 

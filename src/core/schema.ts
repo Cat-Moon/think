@@ -216,6 +216,8 @@ export const Version = z
     /** 产生本版本时补丁每一项的决定；崩溃后用于补记补丁的处理结果 */
     decisions: z.array(OpDecision).nullable().default(null),
     created_at: z.iso.datetime(),
+    /** 恢复旧版本时：恢复的是哪个版本 */
+    restored_from: VersionId.nullable().default(null),
     graph: Graph,
   })
   .refine((v) => v.graph.version === v.version, { message: "版本号与图中的 version 不一致", path: ["graph", "version"] });
@@ -230,6 +232,8 @@ export const WorkspaceConfig = z.object({
   /** 长回合（种子图、补充）的思考程度；null 表示用 CLI 默认 */
   effort_long: z.string().nullable().default(null),
   privacy_notice_seen: z.boolean().default(false),
+  /** 补丁预览中是否提示"接受后程序会检测到的新回路"（默认关闭） */
+  show_new_loops: z.boolean().default(false),
 });
 
 export const MapMeta = z.object({

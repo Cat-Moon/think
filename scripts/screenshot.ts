@@ -1,6 +1,7 @@
 // 用本机 Chrome（无界面）打开图视图并截图，检查默认布局。截图保存在 runs/screenshots/（不进 git）。
-// 用法：先 npm run dev，再 npx tsx scripts/screenshot.ts [序号,…]（序号见 src/web/fixtures/real-graphs.json；demo 表示示例数据）
-import { mkdirSync } from "node:fs";
+// 用法：先用 scripts/seed-workspace.ts 生成工作区，用它启动服务端（THINK_PORT=5184）和 vite（THINK_WEB_PORT=5183 THINK_API_PORT=5184），
+// 再 npx tsx scripts/screenshot.ts <工作区目录> [序号,…]（序号见 src/web/fixtures/real-graphs.json；demo 表示示例图）。THINK_UI 为界面地址
+import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
 import { NODE_H } from "../src/web/layout";
@@ -49,7 +50,12 @@ async function verifyGeometry(page: import("playwright-core").Page, name: string
   if (probe) console.log("  标签字段示例：", JSON.stringify(edges.find((e) => e.d !== 0) ?? edges[0])?.slice(0, 900));
 }
 
-const targets = (process.argv[2] ?? "demo,1,3,5,9,11,15").split(",");
+const [wsDir, targetArg] = process.argv.slice(2);
+if (!wsDir) throw new Error("用法：npx tsx scripts/screenshot.ts <工作区目录> [序号,…]");
+const index = JSON.parse(readFileSync(join(wsDir, "seed-index.json"), "utf8")) as Record<string, string>;
+const UI = process.env.THINK_UI ?? "http://localhost:5183";
+const mapUrl = (t: string) => `${UI}/?map=${encodeURIComponent(index[t]!)}`;
+const targets = (targetArg ?? "demo,1,3,5,9,11,15").split(",");
 const out = join("runs", "screenshots");
 mkdirSync(out, { recursive: true });
 
@@ -60,41 +66,84 @@ page.on("console", (m) => {
   if (m.type() === "error" || m.type() === "warning") problems.push(`[${m.type()}] ${m.text()}`);
 });
 page.on("pageerror", (e) => problems.push(`[pageerror] ${e.message}`));
-
-for (const t of targets) {
-  const url = t === "demo" ? "http://localhost:5173/?fresh" : `http://localhost:5173/?graph=${t}&fresh`;
-  await page.goto(url);
-  await page.waitForSelector(".graph canvas");
-  await page.waitForTimeout(800);
-  await verifyGeometry(page, t, t === targets[0]);
-  const file = join(out, `layout-${t}.png`);
+const shot = async (name: string) => {
+  const file = join(out, `${name}.png`);
   await page.screenshot({ path: file });
   console.log(file);
-}
-// 悬停回路列表的第一项，检查回路标记的显示位置
-await page.goto("http://localhost:5173/?fresh");
-await page.waitForSelector(".loops li");
-await page.waitForTimeout(500);
-await page.hover(".loops li >> nth=1");
+};
+const api = (method: string, path: string, body?: unknown) =>
+  fetch(UI + path, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+const openMap = async (t: string) => {
+  // 默认布局：清空已保存的位置
+  await api("PUT", `/api/maps/${encodeURIComponent(index[t]!)}/layout`, { positions: {} });
+  await page.goto(mapUrl(t));
+  await page.waitForSelector(".graph canvas");
+  await page.waitForTimeout(900);
+};
+
+// 首页与首次启动的隐私说明
+await api("PUT", "/api/settings", { privacy_notice_seen: false });
+await page.goto(UI);
+await page.waitForSelector(".modal");
 await page.waitForTimeout(300);
-await page.screenshot({ path: join(out, "layout-demo-hover-loop.png") });
-console.log(join(out, "layout-demo-hover-loop.png"));
+await shot("m5-privacy");
+await page.click("text=知道了");
+await page.waitForTimeout(300);
+await shot("m5-home");
+
+for (const t of targets) {
+  await openMap(t);
+  await verifyGeometry(page, t, false);
+  await shot(`layout-${t}`);
+}
+
+// 示例图：AI 的建议（含修改类建议）；悬停"修改"那一项
+await openMap("demo");
+await page.hover(".op-modify");
+await page.waitForTimeout(300);
+await shot("m5-demo-modify-hover");
+// 拒绝一项：出现可跳过的理由输入框
+await page.uncheck(".op >> nth=1 >> input[type=checkbox]");
+await page.fill(".reject-reason", "远郊开发主要受房价驱动");
+await shot("m5-demo-reject-reason");
+await page.check(".op >> nth=1 >> input[type=checkbox]");
 
 // 回路较多时：点击左上角的提示，显示全部回路标记
-await page.goto("http://localhost:5173/?fresh");
-await page.waitForSelector(".loop-hint");
-await page.waitForTimeout(500);
-await page.screenshot({ path: join(out, "layout-demo-loop-hint.png") });
 await page.click(".loop-hint");
 await page.waitForTimeout(300);
-await page.screenshot({ path: join(out, "layout-demo-all-loops.png") });
-console.log(join(out, "layout-demo-loop-hint.png"), join(out, "layout-demo-all-loops.png"));
-// 设置：预览中提示新回路（默认关闭，打开后预览面板显示）
-await page.check("text=预览中提示新回路");
+await shot("layout-demo-all-loops");
+await page.click(".loop-hint");
+
+// 回路页、版本页
+await page.click(".tabs button >> nth=1");
+await page.hover(".loops li >> nth=1");
 await page.waitForTimeout(300);
-await page.screenshot({ path: join(out, "layout-demo-new-loops-on.png") });
-await page.uncheck("text=预览中提示新回路");
-console.log(join(out, "layout-demo-new-loops-on.png"));
+await shot("layout-demo-hover-loop");
+await page.click(".tabs button >> nth=2");
+await page.click(".timeline li >> nth=2");
+await page.waitForTimeout(600);
+await shot("m5-demo-view-old-version");
+
+// 设置
+await page.goto(mapUrl("demo"));
+await page.waitForSelector(".graph canvas");
+await page.click("header button[title=设置]");
+await page.waitForTimeout(200);
+await shot("m5-settings");
+
+// 小窗口：图例完整可见；折叠后
+await page.setViewportSize({ width: 1100, height: 640 });
+await page.goto(mapUrl("11"));
+await page.waitForSelector(".graph canvas");
+await page.waitForTimeout(900);
+await shot("m5-small-window-legend");
+const box = await page.locator(".legend").boundingBox();
+const vp = page.viewportSize()!;
+console.log(`  图例：${box ? `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}×${Math.round(box.height)}，${box.y + box.height <= vp.height && box.x + box.width <= vp.width ? "完整可见" : "超出窗口"}` : "未找到"}`);
+await page.click(".legend summary");
+await page.waitForTimeout(200);
+await shot("m5-small-window-legend-folded");
+await page.click(".legend summary");
 
 await browser.close();
 console.log(problems.length ? `浏览器控制台问题：\n${problems.join("\n")}` : "浏览器控制台：没有错误或警告");
