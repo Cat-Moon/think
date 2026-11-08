@@ -1,5 +1,4 @@
 // 调用本机 Claude Code CLI 的最小封装（设计文档第 8.1 节）。
-// M3 会在此基础上加上校验、重试、日志等。
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -40,48 +39,44 @@ export function childEnv(): { env: NodeJS.ProcessEnv; removedApiKey: boolean } {
   return { env, removedApiKey };
 }
 
-export interface ClaudeCallOptions {
-  systemPrompt: string;
-  prompt: string;
-  jsonSchema: object;
-  model?: string;
-  timeoutMs?: number;
-}
-
-export interface ClaudeRawResult {
+export interface RunResult {
   exitCode: number | null;
   stdout: string;
   stderr: string;
-  /** stdout 解析出的 JSON（失败时为 null） */
-  json: Record<string, unknown> | null;
+  /** 被谁终止：用户取消 / 超时 / 正常结束 */
+  killedBy: "abort" | "timeout" | null;
   removedApiKey: boolean;
 }
 
-/** 单次、无状态、禁用工具的调用；提示词通过 stdin 传入 */
-export function callClaude(opts: ClaudeCallOptions): Promise<ClaudeRawResult> {
-  const args = [
-    "-p",
-    "--output-format", "json",
-    "--json-schema", JSON.stringify(opts.jsonSchema),
-    "--system-prompt", opts.systemPrompt,
-    "--tools", "",
-    "--strict-mcp-config",
-    "--setting-sources", "",
-    "--no-session-persistence",
-    "--model", opts.model ?? "sonnet",
-  ];
+/** 在一个空的临时目录里运行 claude；stdin 写入后关闭；结束后删除临时目录 */
+export function runClaude(args: string[], opts: { stdin?: string; signal?: AbortSignal; timeoutMs?: number } = {}): Promise<RunResult> {
   const { env, removedApiKey } = childEnv();
   const cwd = mkdtempSync(join(tmpdir(), "think-cli-"));
 
   return new Promise((resolve, reject) => {
+    if (opts.signal?.aborted) {
+      rmSync(cwd, { recursive: true, force: true });
+      resolve({ exitCode: null, stdout: "", stderr: "", killedBy: "abort", removedApiKey });
+      return;
+    }
     const child = spawn(resolveClaudeBin(), args, { cwd, env, windowsHide: true });
     let stdout = "";
     let stderr = "";
+    let killedBy: RunResult["killedBy"] = null;
     child.stdout.setEncoding("utf8").on("data", (d: string) => (stdout += d));
     child.stderr.setEncoding("utf8").on("data", (d: string) => (stderr += d));
-    const timer = setTimeout(() => child.kill(), opts.timeoutMs ?? 180_000);
+
+    const kill = (why: "abort" | "timeout") => {
+      killedBy ??= why;
+      child.kill();
+    };
+    const onAbort = () => kill("abort");
+    opts.signal?.addEventListener("abort", onAbort, { once: true });
+    const timer = setTimeout(() => kill("timeout"), opts.timeoutMs ?? 180_000);
+
     const cleanup = () => {
       clearTimeout(timer);
+      opts.signal?.removeEventListener("abort", onAbort);
       rmSync(cwd, { recursive: true, force: true });
     };
     child.on("error", (e) => {
@@ -90,14 +85,30 @@ export function callClaude(opts: ClaudeCallOptions): Promise<ClaudeRawResult> {
     });
     child.on("close", (exitCode) => {
       cleanup();
-      let json: Record<string, unknown> | null = null;
-      try {
-        json = JSON.parse(stdout) as Record<string, unknown>;
-      } catch {
-        // 保持 null，由调用方处理
-      }
-      resolve({ exitCode, stdout, stderr, json, removedApiKey });
+      resolve({ exitCode, stdout, stderr, killedBy, removedApiKey });
     });
-    child.stdin.end(opts.prompt, "utf8");
+    child.stdin.on("error", () => undefined); // 进程提前退出时写 stdin 会报 EPIPE，忽略
+    child.stdin.end(opts.stdin ?? "", "utf8");
   });
+}
+
+export interface PrintOptions {
+  systemPrompt: string;
+  jsonSchema: object;
+  model: string;
+}
+
+/** 单次、无状态、禁用工具的结构化输出调用所用的参数 */
+export function printArgs(opts: PrintOptions): string[] {
+  return [
+    "-p",
+    "--output-format", "json",
+    "--json-schema", JSON.stringify(opts.jsonSchema),
+    "--system-prompt", opts.systemPrompt,
+    "--tools", "",
+    "--strict-mcp-config",
+    "--setting-sources", "",
+    "--no-session-persistence",
+    "--model", opts.model,
+  ];
 }

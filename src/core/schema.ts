@@ -8,8 +8,8 @@ export const SCHEMA_VERSION = 1;
 
 export const NodeId = z.string().regex(/^n\d+$/, "节点 ID 形如 n1");
 export const EdgeId = z.string().regex(/^e\d+$/, "边 ID 形如 e1");
-/** 补丁内的新节点临时引用，形如 $a、$b2 */
-export const Ref = z.string().regex(/^\$[a-z][a-z0-9_]*$/, "临时引用形如 $a");
+/** 补丁内的新节点临时引用，形如 $a、$demand、$焦虑（$ 后接不含空白和 $ 的字符） */
+export const Ref = z.string().regex(/^\$[^\s$]{1,40}$/u, "临时引用形如 $a");
 /** add_edge 的端点：已有节点 ID 或本补丁中的临时引用 */
 export const NodeRef = z.union([NodeId, Ref]);
 export const VersionId = z.string().regex(/^v\d{3,}$/, "版本 ID 形如 v001");
@@ -181,6 +181,8 @@ export const PatchResolution = z.object({
   resolved_at: z.iso.datetime(),
   decisions: z.array(OpDecision),
   result_version: VersionId.nullable(),
+  /** true：崩溃后由完整性修复根据版本文件补记（见 map-store 的 repairMap） */
+  recovered: z.boolean().default(false),
 });
 
 export const Patch = z.object({
@@ -203,6 +205,8 @@ export const Version = z
     version: VersionId,
     parent_version: VersionId.nullable(),
     patch_id: PatchId.nullable(),
+    /** 产生本版本时补丁每一项的决定；崩溃后用于补记补丁的处理结果 */
+    decisions: z.array(OpDecision).nullable().default(null),
     created_at: z.iso.datetime(),
     graph: Graph,
   })
@@ -252,9 +256,14 @@ export const AiOutput = z.object({
   possible_duplicates: z.array(PossibleDuplicate),
 });
 
-/** 传给 `claude --json-schema` 的 JSON Schema */
+/**
+ * 传给 `claude --json-schema` 的 JSON Schema。
+ * 用 io: "input" 生成：不带 additionalProperties: false，AI 多写一个无关字段不会让整个输出被 CLI 拒绝
+ * （CLI 内部最多重试 5 次，失败时报 error_max_structured_output_retries 且看不到原因）。
+ * 多余的字段在 zod 解析时被丢弃；内容规则由 ai-check.ts 检查。
+ */
 export function aiOutputJsonSchema(): Record<string, unknown> {
-  return z.toJSONSchema(AiOutput, { target: "draft-7" }) as Record<string, unknown>;
+  return z.toJSONSchema(AiOutput, { target: "draft-7", io: "input" }) as Record<string, unknown>;
 }
 
 // ---------- 类型 ----------

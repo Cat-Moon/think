@@ -148,4 +148,21 @@ describe("AiOutput", () => {
     expect(schema.required).toEqual(expect.arrayContaining(["kind", "message", "question", "ops", "possible_duplicates"]));
     expect(JSON.stringify(schema)).toContain("add_edge");
   });
+
+  it("给 CLI 的 JSON Schema 不禁止多余字段，zod 解析时丢弃多余字段", () => {
+    expect(JSON.stringify(aiOutputJsonSchema())).not.toContain('"additionalProperties":false');
+    const out = AiOutput.parse({
+      kind: "patch",
+      message: "",
+      question: "？",
+      ops: [{ op: "reverse_edge", id: "e1", rationale: "多写的字段" }],
+      possible_duplicates: [],
+    });
+    expect(out.ops[0]).toEqual({ op: "reverse_edge", id: "e1" });
+  });
+
+  it("临时引用可以用中文", () => {
+    expect(PatchOp.safeParse({ op: "add_node", ref: "$焦虑", label: "焦虑程度" }).success).toBe(true);
+    expect(PatchOp.safeParse({ op: "add_node", ref: "$ a", label: "x" }).success).toBe(false);
+  });
 });

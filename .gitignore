@@ -20,3 +20,6 @@ logs/
 .idea/
 .DS_Store
 Thumbs.db
+
+# 提示词回归的输出（含模拟对话和调用日志）
+runs/

@@ -4,3 +4,6 @@ export * from "./loops";
 export * from "./validate";
 export * from "./version";
 export * from "./patch";
+export * from "./describe";
+export * from "./ai-context";
+export * from "./ai-check";

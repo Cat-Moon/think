@@ -10,7 +10,10 @@ npm run dev        # 服务 127.0.0.1:5174 + 页面 http://localhost:5173
 npm test           # 单元测试（含 core/ 依赖边界检查）
 npm run typecheck
 npx tsx scripts/smoke-cli.ts [model]   # 真实调用一次 claude -p，检查结构化输出
+npx tsx scripts/eval-prompts.ts --runs 3   # 提示词回归：模拟多轮对话，报告在 runs/（不进 git）
 ```
 
 AI 通过本机已登录的 Claude Code CLI 调用（使用订阅，不需要 API key）。
 工作区数据默认在 `~/Documents/Think`，不在仓库内。
+
+系统提示词在 [prompts/system.md](prompts/system.md)，可直接修改，下次调用即生效。

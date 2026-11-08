@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { findLoops } from "../../core/loops";
-import { makePatch } from "../../core/patch";
+import { makePatch, resolvePatch } from "../../core/patch";
 import type { PatchOp } from "../../core/schema";
 import { nextVersion } from "../../core/version";
 import {
@@ -20,6 +20,7 @@ import {
   readNotes,
   readPatch,
   readVersion,
+  repairMap,
   restoreTo,
   savePatch,
   updateMeta,
@@ -170,6 +171,26 @@ describe("补丁与版本", () => {
     await savePatch(dir, stale);
     await commitPatch(dir, patch.patch_id, "all", T(2));
     await expect(commitPatch(dir, "p002", "all", T(3))).rejects.toThrow(/当前版本是 v001/);
+  });
+});
+
+describe("崩溃恢复", () => {
+  it("写完版本、标记补丁之前崩溃：完整性检查发现，打开 Map 时自动补记为已应用", async () => {
+    const { dir, patch } = await mapWithPatch();
+    const choices = { 0: { decision: "accepted" }, 1: { decision: "accepted" }, 2: { decision: "accepted" }, 3: { decision: "accepted" }, 4: { decision: "accepted" }, 5: { decision: "accepted" } } as const;
+    // 模拟 commitPatch 只完成了前一半：版本写了，补丁没标记（第 7 项被拒绝）
+    const { version, patch: expected } = resolvePatch(await readGraph(dir), patch, choices, T(2));
+    await writeVersion(dir, version!, T(2));
+    expect((await readPatch(dir, patch.patch_id)).resolution).toBeNull();
+    expect(await checkIntegrity(dir)).toEqual(["补丁 p001 已产生版本 v001，但仍标记为未处理（可自动修复）"]);
+
+    await openMap(dir);
+    const repaired = await readPatch(dir, patch.patch_id);
+    expect(repaired.resolution).toEqual({ ...expected.resolution, resolved_at: version!.created_at, recovered: true });
+    expect(repaired.resolution?.decisions[6]).toMatchObject({ decision: "rejected" });
+    expect(await checkIntegrity(dir)).toEqual([]);
+    expect(await repairMap(dir)).toEqual([]); // 再次修复没有可做的
+    await expect(commitPatch(dir, patch.patch_id, "all", T(3))).rejects.toThrow(/已经处理过/);
   });
 });
 

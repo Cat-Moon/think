@@ -230,13 +230,13 @@ export function resolvePatch(graph: Graph, patch: Patch, choices: Choices, now: 
   let version: Version | null = null;
   if (accepted.length > 0) {
     const content = applyOps(graph, accepted, patch.origin);
-    version = nextVersion(graph, content, patch.patch_id, now);
+    version = nextVersion(graph, content, patch.patch_id, now, decisions);
   }
 
   return {
     patch: {
       ...structuredClone(patch),
-      resolution: { resolved_at: now, decisions, result_version: version?.version ?? null },
+      resolution: { resolved_at: now, decisions, result_version: version?.version ?? null, recovered: false },
     },
     version,
   };

@@ -1,6 +1,6 @@
 // 版本管理：快照、差异、恢复（设计文档第 6 节第 7 条、第 7.5 节）。
 import { firstSeqId, nextSeqId } from "./ids";
-import { SCHEMA_VERSION, type Frame, type Graph, type Version } from "./schema";
+import { SCHEMA_VERSION, type Frame, type Graph, type OpDecision, type Version } from "./schema";
 
 /** 创建 Map 时的空图 v000 */
 export function initialVersion(topic: string, now: string): Version {
@@ -11,7 +11,7 @@ export function initialVersion(topic: string, now: string): Version {
     nodes: [],
     edges: [],
   };
-  return { version: graph.version, parent_version: null, patch_id: null, created_at: now, graph };
+  return { version: graph.version, parent_version: null, patch_id: null, decisions: null, created_at: now, graph };
 }
 
 /** 以 parent 为基础生成下一个版本快照（graph 内容由调用方给出） */
@@ -20,6 +20,7 @@ export function nextVersion(
   content: Pick<Graph, "frame" | "nodes" | "edges">,
   patchId: string | null,
   now: string,
+  decisions: OpDecision[] | null = null,
 ): Version {
   const version = nextSeqId(parent.version);
   // 只取 frame / nodes / edges：content 可能是一张完整的图，不能让它的旧 version 覆盖新版本号
@@ -30,7 +31,7 @@ export function nextVersion(
     nodes: content.nodes,
     edges: content.edges,
   });
-  return { version, parent_version: parent.version, patch_id: patchId, created_at: now, graph };
+  return { version, parent_version: parent.version, patch_id: patchId, decisions, created_at: now, graph };
 }
 
 /**

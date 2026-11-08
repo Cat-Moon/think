@@ -93,10 +93,41 @@ export async function readMeta(dir: string): Promise<MapMeta> {
   return readJson(paths(dir).meta, MapMetaSchema);
 }
 
-/** 打开 Map：先检查并执行 schema 迁移，再读元信息 */
+/** 打开 Map：先检查并执行 schema 迁移，再自动修复可修复的不一致，最后读元信息 */
 export async function openMap(dir: string): Promise<MapMeta> {
   await migrateMapFolder(dir);
+  await repairMap(dir);
   return readMeta(dir);
+}
+
+/**
+ * 自动修复崩溃留下的不一致，返回做了哪些修复：
+ * - 补丁已经产生了版本，但补丁文件仍是"未处理"（写完版本、标记补丁之前崩溃）：
+ *   按版本文件中记下的决定，把补丁标记为已应用（recovered: true）
+ * - graph.json 与最新版本不一致：从 versions/ 重建
+ */
+export async function repairMap(dir: string): Promise<string[]> {
+  const repairs: string[] = [];
+  const patchIds = new Set(await listPatchIds(dir));
+  for (const id of await listVersionIds(dir)) {
+    const v = await readVersion(dir, id);
+    if (!v.patch_id || !patchIds.has(v.patch_id)) continue;
+    const p = await readPatch(dir, v.patch_id);
+    if (p.resolution !== null) continue;
+    const resolved = PatchSchema.parse({
+      ...p,
+      resolution: { resolved_at: v.created_at, decisions: v.decisions ?? [], result_version: v.version, recovered: true },
+    });
+    await writeJson(paths(dir).patch(p.patch_id), resolved);
+    repairs.push(`补丁 ${p.patch_id} 已产生版本 ${v.version}，已补记为已应用`);
+  }
+  const latest = await latestVersionId(dir);
+  const g = await readJson(paths(dir).graph, GraphSchema).catch(() => null);
+  if (g?.version !== latest) {
+    await rebuildGraph(dir);
+    repairs.push(`graph.json 已从 ${latest} 重建`);
+  }
+  return repairs;
 }
 
 export async function updateMeta(dir: string, changes: Partial<Pick<MapMeta, "title" | "archived">>, now: string): Promise<MapMeta> {
@@ -290,7 +321,8 @@ export async function checkIntegrity(dir: string): Promise<string[]> {
       if (!patchIds.has(v.patch_id)) problems.push(`${id} 引用的补丁 ${v.patch_id} 不存在`);
       else {
         const p = await readPatch(dir, v.patch_id);
-        if (p.resolution?.result_version !== id) problems.push(`${id} 引用补丁 ${v.patch_id}，但补丁记录的结果版本是 ${p.resolution?.result_version ?? "未处理"}`);
+        if (p.resolution === null) problems.push(`补丁 ${v.patch_id} 已产生版本 ${id}，但仍标记为未处理（可自动修复）`);
+        else if (p.resolution.result_version !== id) problems.push(`${id} 引用补丁 ${v.patch_id}，但补丁记录的结果版本是 ${p.resolution.result_version}`);
       }
     }
   }
