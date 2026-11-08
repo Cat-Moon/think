@@ -4,7 +4,25 @@ import { applyOps } from "../core/patch";
 import { Graph as GraphSchema, type Graph, type PatchOp } from "../core/schema";
 import { current, demoState, resolvePending } from "./demo";
 import fixtures from "./fixtures/real-graphs.json";
-import { CURVE_BAND, MARKER_R, NODE_GAP, boxGap, computeLayout, markerEdges, nodeBoxes, placeLoopMarkers, segmentDistance, type Positions } from "./layout";
+import { MARKER_R, NODE_GAP, boxGap, computeLayout, nodeBoxes, placeLoopMarkers, segmentDistance, type Positions } from "./layout";
+import { arrange, edgePath, routeEdges, routeInputs } from "./routing";
+
+/** 路由之后的问题，写成可读的文字 */
+function routeProblems(graph: Graph, pos: Positions): string[] {
+  const label = (id: string) => graph.nodes.find((n) => n.id === id)?.label ?? id;
+  const { issues } = routeEdges(routeInputs(graph), nodeBoxes(graph, pos));
+  return issues.map((i) => {
+    const e = graph.edges.find((x) => x.id === i.edge)!;
+    return `${i.kind}：${label(e.from)}→${label(e.to)} / ${i.other}`;
+  });
+}
+
+/** 路由之后每条边的实际路径 */
+function routedPaths(graph: Graph, pos: Positions) {
+  const boxes = nodeBoxes(graph, pos);
+  const { routes } = routeEdges(routeInputs(graph), boxes);
+  return [...routes.values()].map((r) => edgePath(boxes.get(r.from)!, boxes.get(r.to)!, r.d));
+}
 
 /** 合成的大图（不是 AI 生成的），用来压力测试 10 个变量的情况 */
 function synthetic(): Graph {
@@ -44,8 +62,8 @@ describe("自动布局（真实生成的图）", () => {
   });
 
   for (const { name, graph } of cases) {
-    it(`${name}：节点外框不重叠、不挤成一条、回路标记不压节点`, () => {
-      const pos = computeLayout(graph);
+    it(`${name}：节点外框不重叠、不挤成一条；边不穿过变量、不互相重叠；标签不压变量、边、箭头；回路标记不压节点和边`, () => {
+      const pos = arrange(graph).positions;
       const ids = graph.nodes.filter((n) => n.status === "accepted").map((n) => n.id);
       expect(Object.keys(pos).sort()).toEqual([...ids].sort());
       expectNoOverlap(graph, pos, name);
@@ -59,16 +77,18 @@ describe("自动布局（真实生成的图）", () => {
 
       // 回路标记（全部同时显示的最坏情况）
       const loops = findLoops(graph).loops;
-      const edges = markerEdges(graph);
-      const markers = placeLoopMarkers(loops, nodeBoxes(graph, pos), edges);
+      expect(routeProblems(graph, pos), name).toEqual([]);
+      const paths = routedPaths(graph, pos);
+      const markers = placeLoopMarkers(loops, nodeBoxes(graph, pos), paths);
       for (const [id, m] of Object.entries(markers)) {
         for (const b of boxes) {
           const clear = Math.abs(m.x - b.x) >= b.w / 2 + MARKER_R || Math.abs(m.y - b.y) >= b.h / 2 + MARKER_R;
           expect(clear, `${name}：回路标记 ${id} 压在节点上`).toBe(true);
         }
-        for (const e of edges) {
-          const d = segmentDistance(m, pos[e.from]!, pos[e.to]!);
-          expect(d, `${name}：回路标记 ${id} 压在边 ${e.from}→${e.to} 上`).toBeGreaterThanOrEqual(MARKER_R + (e.curved ? CURVE_BAND : 0));
+        for (const p of paths) {
+          for (let k = 1; k < p.length; k++) {
+            expect(segmentDistance(m, p[k - 1]!, p[k]!), `${name}：回路标记 ${id} 压在边上`).toBeGreaterThanOrEqual(MARKER_R);
+          }
         }
       }
       const ms = Object.values(markers);
@@ -85,7 +105,7 @@ describe("自动布局（真实生成的图）", () => {
 describe("增量布局：新增变量或关系后，已有节点不动", () => {
   for (const { name, graph } of cases.slice(0, 6)) {
     it(name, () => {
-      const before = computeLayout(graph);
+      const before = arrange(graph).positions;
       const live = graph.nodes.filter((n) => n.status === "accepted");
       const ops: PatchOp[] = [
         { op: "add_node", ref: "$x", label: "新增的变量甲" },
@@ -95,9 +115,10 @@ describe("增量布局：新增变量或关系后，已有节点不动", () => {
         { op: "add_edge", from: "$y", to: live[0]!.id, polarity: "+", rationale: "" },
       ];
       const after = applyOps(graph, ops.map((op, index) => ({ index, op })), "ai");
-      const pos = computeLayout(after, before);
+      const pos = arrange(after, before).positions;
       for (const id of Object.keys(before)) expect(pos[id], `${name}：${id} 被移动了`).toEqual(before[id]);
       expectNoOverlap(after, pos, `${name}（新增后）`);
+      expect(routeProblems(after, pos), `${name}（新增后）`).toEqual([]);
     });
   }
 

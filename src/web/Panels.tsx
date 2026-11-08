@@ -108,6 +108,8 @@ export function PatchPanel(props: {
   patch: Patch;
   preview: Preview;
   accepted: Record<number, boolean>;
+  /** 设置项：是否提示接受后程序会检测到的新回路（默认关闭） */
+  showNewLoops: boolean;
   onToggle: (index: number, value: boolean) => void;
   onHover: (index: number | null) => void;
   onResolve: (choices: Choices) => void;
@@ -156,7 +158,7 @@ export function PatchPanel(props: {
         </p>
       ))}
       {applyError && <p className="warn">⚠ 这个建议无法应用：{applyError}</p>}
-      {newLoops.length > 0 && (
+      {props.showNewLoops && newLoops.length > 0 && (
         <p className="meta">
           接受后程序会检测到新的回路：{newLoops.map((l) => `${l.polarity === "?" ? "?" : l.polarity}（${[...l.nodes, l.nodes[0]!].map(label).join(" → ")}）`).join("；")}
         </p>
@@ -187,6 +189,7 @@ export function LoopPanel(props: { graph: Graph; loops: Loop[]; truncated: boole
             <span>
               {[...l.nodes, l.nodes[0]!].map(label).join(" → ")}
               {l.uncertain && "（含不确定的关系）"}
+              {l.edges.some((id) => props.graph.edges.find((e) => e.id === id)?.contested) && <span className="contested-note">（含有争议的关系 ⚑）</span>}
             </span>
           </li>
         ))}

@@ -5,7 +5,8 @@ import { useEffect, useRef } from "react";
 import type { Loop } from "../core/loops";
 import type { Preview } from "../core/preview";
 import type { Graph } from "../core/schema";
-import { MARKER_R, NODE_H, computeLayout, markerEdges, nodeBoxes, nodeWidth, placeLoopMarkers, visibleLoopIds, type Positions } from "./layout";
+import { MARKER_R, MAX_ALWAYS_SHOWN_LOOPS, NODE_H, edgeLabelText, nodeBoxes, nodeWidth, placeLoopMarkers, visibleLoopIds, type Positions } from "./layout";
+import { arrange, edgePath, routeEdges, routeInputs, type EdgeRoute } from "./routing";
 
 export type { Positions };
 export type Selection = { kind: "node" | "edge"; id: string } | null;
@@ -28,10 +29,13 @@ export interface GraphViewProps {
   hoverLoop: string | null;
   onLoopClick: (id: string | null) => void;
   showRejected: boolean;
+  /** 回路较多时，是否在图上显示全部回路标记（画布左上角的提示切换） */
+  showAllLoops: boolean;
+  onToggleAllLoops: () => void;
 }
 
-const POL = { "+": "+", "-": "−", "?": "?" } as const;
-const MAX_FIT_ZOOM = 1.6;
+const MAX_FIT_ZOOM = 2.0;
+const ORANGE = "#dd6b20";
 
 export const STYLE: StylesheetJson = [
   {
@@ -53,15 +57,18 @@ export const STYLE: StylesheetJson = [
   {
     selector: "edge",
     style: {
-      "curve-style": "bezier",
-      // 互逆或平行的边错开弯曲
-      "control-point-step-size": 70,
+      // 弯曲量由 routing.ts 决定：互逆或平行的边分到两侧，穿过变量或与其他边重叠的边绕开
+      "curve-style": "unbundled-bezier",
+      "control-point-distances": "data(cpd)",
+      "control-point-weights": 0.5,
       width: 2,
       "line-color": "#718096",
       "target-arrow-color": "#718096",
       "target-arrow-shape": "triangle",
       "arrow-scale": 1.2,
-      label: "data(label)",
+      // 标签沿边滑动到 routing.ts 选好的位置（离起点的距离），避开变量、其他边和箭头
+      "source-label": "data(label)",
+      "source-text-offset": "data(lo)" as unknown as number,
       "font-size": 16,
       "font-weight": "bold",
       "text-background-color": "#ffffff",
@@ -74,14 +81,16 @@ export const STYLE: StylesheetJson = [
   { selector: "edge.neg", style: { "line-color": "#c53030", "target-arrow-color": "#c53030", color: "#c53030" } },
   { selector: "edge.unk", style: { "line-color": "#718096", "target-arrow-color": "#718096", color: "#4a5568" } },
   { selector: "edge.uncertain", style: { "line-style": "dashed", "line-dash-pattern": [8, 5] } },
+  // 有争议：紫色描边加 ⚑（与 AI 建议的橙色、选中的蓝色区分）
   { selector: "edge.contested", style: { "line-outline-width": 3, "line-outline-color": "#d6bcfa" } },
-  { selector: ".rejected", style: { opacity: 0.25, "line-style": "dotted" } },
-  // 补丁预览
-  { selector: "node.ghost", style: { "border-style": "dashed", "border-color": "#dd6b20", "border-width": 2, "background-color": "#fffaf0" } },
-  { selector: "edge.ghost", style: { "line-style": "dashed", "line-dash-pattern": [4, 4], opacity: 0.85 } },
+  // 已拒绝（打开"显示已拒绝的"时）：淡灰色实线（虚线只用于"不确定"）
+  { selector: ".rejected", style: { opacity: 0.25, "line-color": "#a0aec0", "target-arrow-color": "#a0aec0" } },
+  // 补丁预览一律用橙色：新增为橙色实线 / 橙色边框加浅橙底；修改为橙色描边；去掉为淡红色实线并加 ✕
+  { selector: "node.ghost", style: { "border-color": ORANGE, "border-width": 2.5, "background-color": "#fffaf0" } },
+  { selector: "edge.ghost", style: { "line-color": ORANGE, "target-arrow-color": ORANGE } },
   { selector: "edge.ghost-mod", style: { "line-outline-width": 3, "line-outline-color": "#fbd38d" } },
-  { selector: "node.ghost-mod", style: { "border-color": "#dd6b20", "border-width": 3 } },
-  { selector: ".ghost-remove", style: { "line-style": "dashed", "line-color": "#e53e3e", "target-arrow-color": "#e53e3e", opacity: 0.6 } },
+  { selector: "node.ghost-mod", style: { "border-color": ORANGE, "border-width": 3 } },
+  { selector: ".ghost-remove", style: { "line-color": "#e53e3e", "target-arrow-color": "#e53e3e", "border-color": "#e53e3e", opacity: 0.45 } },
   { selector: ".ghost-off", style: { opacity: 0.15 } },
   { selector: ".hover-op", style: { "line-outline-width": 5, "line-outline-color": "#f6ad55", "border-width": 4, "border-color": "#dd6b20" } },
   // 回路标记
@@ -148,10 +157,10 @@ export function buildElements(props: GraphViewProps): ElementDefinition[] {
     if (rejected) cls.push("rejected");
     if (g) cls.push(g.effect === "add" ? "ghost" : g.effect === "remove" ? "ghost-remove" : "ghost-mod");
     if (g && accepted[g.op] === false) cls.push("ghost-off");
-    const label = `${POL[e.polarity]}${e.delay ? " ‖" : ""}${e.contested ? " ⚑" : ""}`;
-    out.push({ group: "edges", data: { id: e.id, source: e.from, target: e.to, label }, classes: cls.join(" ") });
+    const label = `${edgeLabelText(e)}${g?.effect === "remove" ? " ✕" : ""}`;
+    out.push({ group: "edges", data: { id: e.id, source: e.from, target: e.to, label, cpd: 0, lo: 20 }, classes: cls.join(" ") });
   }
-  const shown = new Set(visibleLoopIds(props.loops.map((l) => l.id), props.highlightLoop, props.hoverLoop));
+  const shown = new Set(visibleLoopIds(props.loops.map((l) => l.id), props.highlightLoop, props.hoverLoop, props.showAllLoops));
   for (const l of props.loops) {
     if (!shown.has(l.id)) continue;
     const cls = ["loop", l.polarity === "?" ? "U" : l.polarity];
@@ -186,8 +195,10 @@ export function GraphView(props: GraphViewProps) {
 
   // 创建一次
   useEffect(() => {
-    const cy = cytoscape({ container: container.current, style: STYLE, minZoom: 0.3, maxZoom: 2.5 });
+    const cy = cytoscape({ container: container.current, style: STYLE, minZoom: 0.3, maxZoom: 3 });
     cyRef.current = cy;
+    // 开发时供截图脚本核对几何（控制点、标签位置）
+    if (import.meta.env.DEV) (window as unknown as { __cy?: Core }).__cy = cy;
     cy.on("tap", "node.var", (e) => propsRef.current.onSelect({ kind: "node", id: e.target.id() }));
     cy.on("tap", "edge", (e) => propsRef.current.onSelect({ kind: "edge", id: e.target.id() }));
     cy.on("tap", "node.loop", (e) => {
@@ -202,6 +213,8 @@ export function GraphView(props: GraphViewProps) {
     });
     cy.on("drag", "node.var", () => placeMarkers(cy, propsRef.current));
     cy.on("dragfree", "node.var", () => {
+      applyRoutes(cy, propsRef.current);
+      placeMarkers(cy, propsRef.current);
       const positions: Positions = { ...propsRef.current.positions };
       cy.nodes("node.var").forEach((n) => {
         positions[n.id()] = { x: Math.round(n.position().x), y: Math.round(n.position().y) };
@@ -226,7 +239,7 @@ export function GraphView(props: GraphViewProps) {
     if (!cy) return;
     const g = viewGraph(props);
     if (Object.keys(props.positions).length === 0) needsFit.current = true;
-    const pos = computeLayout(g, props.positions, props.showRejected);
+    const { positions: pos } = arrange(g, props.positions, props.showRejected);
     cy.batch(() => {
       cy.elements().remove();
       cy.add(buildElements(props));
@@ -235,6 +248,7 @@ export function GraphView(props: GraphViewProps) {
         if (p) n.position({ ...p });
       });
     });
+    applyRoutes(cy, props);
     placeMarkers(cy, props);
     applyHighlight(cy, props);
     fitIfReady();
@@ -245,7 +259,7 @@ export function GraphView(props: GraphViewProps) {
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
-    const shown = new Set(visibleLoopIds(props.loops.map((l) => l.id), props.highlightLoop, props.hoverLoop));
+    const shown = new Set(visibleLoopIds(props.loops.map((l) => l.id), props.highlightLoop, props.hoverLoop, props.showAllLoops));
     const present = new Set(cy.nodes("node.loop").map((n) => n.data("loop") as string));
     if ([...shown].some((id) => !present.has(id)) || [...present].some((id) => !shown.has(id))) {
       cy.nodes("node.loop").remove();
@@ -253,22 +267,53 @@ export function GraphView(props: GraphViewProps) {
     }
     placeMarkers(cy, props);
     applyHighlight(cy, props);
-  }, [props.selection, props.highlightLoop, props.hoverLoop, props.hoverOp]);
+  }, [props.selection, props.highlightLoop, props.hoverLoop, props.hoverOp, props.showAllLoops]);
 
-  return <div ref={container} className="graph" />;
+  const many = props.loops.length > MAX_ALWAYS_SHOWN_LOOPS;
+  return (
+    <div className="graph-wrap">
+      <div ref={container} className="graph" />
+      {many && (
+        <button className="loop-hint" onClick={props.onToggleAllLoops}>
+          {props.showAllLoops ? "收起回路标记" : `${props.loops.length} 个回路 · 点击查看`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function currentPositions(cy: Core): Positions {
+  const out: Positions = {};
+  cy.nodes("node.var").forEach((n) => {
+    out[n.id()] = { ...n.position() };
+  });
+  return out;
+}
+
+/** 当前位置下的边路由（只针对图上显示的边） */
+function routesFor(cy: Core, props: GraphViewProps): Map<string, EdgeRoute> {
+  const g = viewGraph(props);
+  const shownEdges = new Set(cy.edges().map((e) => e.id()));
+  const inputs = routeInputs(g, props.showRejected).filter((e) => shownEdges.has(e.id));
+  return routeEdges(inputs, nodeBoxes(g, currentPositions(cy), props.showRejected)).routes;
+}
+
+/** 把每条边的弯曲量和标签位置写进元素数据 */
+function applyRoutes(cy: Core, props: GraphViewProps) {
+  const routes = routesFor(cy, props);
+  cy.batch(() => {
+    for (const r of routes.values()) cy.getElementById(r.id).data({ cpd: r.d, lo: r.labelOffset });
+  });
 }
 
 /** 回路标记放在回路附近、避开所有节点和其他标记 */
 function placeMarkers(cy: Core, props: GraphViewProps) {
   const markers = cy.nodes("node.loop");
   if (markers.empty()) return;
-  const current: Positions = {};
-  cy.nodes("node.var").forEach((n) => {
-    current[n.id()] = n.position();
-  });
-  const boxes = nodeBoxes(viewGraph(props), current, props.showRejected);
+  const boxes = nodeBoxes(viewGraph(props), currentPositions(cy), props.showRejected);
+  const paths = [...routesFor(cy, props).values()].flatMap((r) => (boxes.has(r.from) && boxes.has(r.to) ? [edgePath(boxes.get(r.from)!, boxes.get(r.to)!, r.d)] : []));
   const ids = new Set(markers.map((m) => m.data("loop") as string));
-  const placed = placeLoopMarkers(props.loops.filter((l) => ids.has(l.id)), boxes, markerEdges(viewGraph(props), props.showRejected));
+  const placed = placeLoopMarkers(props.loops.filter((l) => ids.has(l.id)), boxes, paths);
   markers.forEach((m) => {
     const p = placed[m.data("loop") as string];
     if (p) m.position(p);

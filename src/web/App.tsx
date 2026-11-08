@@ -32,6 +32,21 @@ function loadPositions(): Positions {
     return {};
   }
 }
+const NEW_LOOPS_KEY = "think-show-new-loops";
+function loadFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+function saveFlag(key: string, v: boolean) {
+  try {
+    localStorage.setItem(key, v ? "1" : "0");
+  } catch {
+    // 忽略
+  }
+}
 function savePositions(p: Positions) {
   try {
     localStorage.setItem(POS_KEY, JSON.stringify(p));
@@ -44,6 +59,9 @@ export function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [state, setState] = useState<DemoState>(initialState);
   const [hoverLoop, setHoverLoop] = useState<string | null>(null);
+  const [showAllLoops, setShowAllLoops] = useState(false);
+  // 设置：补丁预览中是否提示"接受后程序会检测到的新回路"（默认关闭；M5 存入 workspace.json）
+  const [showNewLoops, setShowNewLoops] = useState(() => loadFlag(NEW_LOOPS_KEY));
   const [positions, setPositions] = useState<Positions>(loadPositions);
   const [selection, setSelection] = useState<Selection>(null);
   const [highlightLoop, setHighlightLoop] = useState<string | null>(null);
@@ -86,6 +104,17 @@ export function App() {
         <label className="toggle">
           <input type="checkbox" checked={showRejected} onChange={(e) => setShowRejected(e.target.checked)} /> 显示已拒绝的
         </label>
+        <label className="toggle" title="在 AI 建议的预览中，提示接受后程序会检测到的新回路">
+          <input
+            type="checkbox"
+            checked={showNewLoops}
+            onChange={(e) => {
+              setShowNewLoops(e.target.checked);
+              saveFlag(NEW_LOOPS_KEY, e.target.checked);
+            }}
+          />{" "}
+          预览中提示新回路
+        </label>
         <button onClick={relayout}>重新布局</button>
         <button onClick={reset}>重置示例</button>
       </header>
@@ -104,6 +133,8 @@ export function App() {
           hoverLoop={hoverLoop}
           onLoopClick={setHighlightLoop}
           showRejected={showRejected}
+          showAllLoops={showAllLoops}
+          onToggleAllLoops={() => setShowAllLoops((v) => !v)}
         />
         <aside>
           <SelectionPanel graph={graph} selection={selection} locked={Boolean(state.pending)} onEdgeAction={(id, a, o) => setState((s) => applyEdgeAction(s, id, a, o))} />
@@ -113,6 +144,7 @@ export function App() {
               patch={state.pending}
               preview={preview}
               accepted={accepted}
+              showNewLoops={showNewLoops}
               onToggle={(i, v) => setAccepted((a) => ({ ...a, [i]: v }))}
               onHover={setHoverOp}
               onResolve={(choices) => {
@@ -124,7 +156,11 @@ export function App() {
           )}
           <LoopPanel graph={graph} loops={loops} truncated={truncated} highlight={highlightLoop} onClick={setHighlightLoop} onHover={setHoverLoop} />
           <div className="legend">
-            <span className="pol pol-pos">→(+)</span> 同向　<span className="pol pol-neg">→(−)</span> 反向　<span className="pol pol-unk">→(?)</span> 未知　‖ 有延迟　⚑ 有争议　虚线：不确定　橙色虚框：AI 建议（预览）
+            <span className="pol pol-pos">→(+)</span> 同向　<span className="pol pol-neg">→(−)</span> 反向　<span className="pol pol-unk">→(?)</span> 未知　‖ 有延迟
+            <br />
+            <span className="swatch contested" /> 紫色描边加 ⚑：有争议　<span className="swatch dashed" /> 虚线：你标为不确定
+            <br />
+            <span className="swatch ghost" /> 橙色：AI 建议（预览，尚未接受）　<span className="swatch selected" /> 蓝色描边：选中
           </div>
         </aside>
       </main>

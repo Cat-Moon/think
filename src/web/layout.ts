@@ -17,6 +17,13 @@ export const nodeWidth = (label: string) => Math.max(72, [...label].length * 15 
 /** 节点外框之间至少留出的间距 */
 export const NODE_GAP = 56;
 export const MARKER_R = 16;
+/** 边的标签高度、宽度估算；箭头附近不放标签的长度 */
+export const LABEL_H = 20;
+export const ARROW_ZONE = 26;
+export const labelWidth = (text: string) => [...text].length * 10 + 10;
+const POL_TEXT = { "+": "+", "-": "−", "?": "?" } as const;
+export const edgeLabelText = (e: { polarity: "+" | "-" | "?"; delay: boolean; contested: boolean }) =>
+  `${POL_TEXT[e.polarity]}${e.delay ? " ‖" : ""}${e.contested ? " ⚑" : ""}`;
 
 export interface Box {
   x: number;
@@ -140,6 +147,8 @@ export function computeLayout(graph: Graph, fixed: Positions = {}, showRejected 
   const sized = nodes.map((n) => ({ id: n.id, w: nodeWidth(n.label) }));
   removeOverlaps(placed, sized, movable);
   if (!hasFixed) normalizeAspect(placed, sized);
+  ensureEdgeRoom(placed, sized, edges, movable);
+  removeOverlaps(placed, sized, movable);
   settleStuck(placed, sized, movable);
   for (const id of Object.keys(placed)) placed[id] = { x: Math.round(placed[id]!.x), y: Math.round(placed[id]!.y) };
   return placed;
@@ -175,6 +184,44 @@ export function normalizeAspect(pos: Positions, nodes: { id: string; w: number }
     for (const n of nodes) pos[n.id] = { x: cx + (pos[n.id]!.x - cx) * 0.7, y: cy + (pos[n.id]!.y - cy) * 1.25 + (n.id.length % 2 ? 1 : -1) };
     removeOverlaps(pos, nodes, all);
     ({ w, h } = bbox(pos, nodes));
+  }
+}
+
+/**
+ * 边要有足够的长度放下标签而不压住箭头：两端外框之间（沿连线方向）至少留出
+ * 标签宽度 + 箭头区域 + 余量；不够时沿连线方向把可移动的节点推开。
+ */
+export function ensureEdgeRoom(pos: Positions, nodes: { id: string; w: number }[], edges: Graph["edges"], movable: Set<string>) {
+  const width = new Map(nodes.map((n) => [n.id, n.w]));
+  for (let iter = 0; iter < 20; iter++) {
+    let moved = false;
+    for (const e of edges) {
+      const a = pos[e.from];
+      const b = pos[e.to];
+      if (!a || !b) continue;
+      const ma = movable.has(e.from);
+      const mb = movable.has(e.to);
+      if (!ma && !mb) continue;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy) || 1;
+      // 连线穿出两端外框的长度（矩形中心沿方向 (dx, dy) 到边界的距离）
+      const exit = (w: number) => Math.min(Math.abs(dx) > 0.01 ? (w / 2) * (len / Math.abs(dx)) : Infinity, Math.abs(dy) > 0.01 ? (NODE_H / 2) * (len / Math.abs(dy)) : Infinity);
+      const visible = len - exit(width.get(e.from)!) - exit(width.get(e.to)!);
+      const need = labelWidth(edgeLabelText(e)) + ARROW_ZONE + 16;
+      if (visible >= need) continue;
+      const push = need - visible + 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      const sa = ma && mb ? push / 2 : ma ? push : 0;
+      const sb = ma && mb ? push / 2 : mb ? push : 0;
+      a.x -= ux * sa;
+      a.y -= uy * sa;
+      b.x += ux * sb;
+      b.y += uy * sb;
+      moved = true;
+    }
+    if (!moved) return;
   }
 }
 
@@ -244,15 +291,6 @@ export function removeOverlaps(pos: Positions, nodes: { id: string; w: number }[
  * 回路标记的位置：从回路各节点的中心开始，向外螺旋搜索，找到第一个不压在任何节点上、
  * 也不压在其他标记上的位置。
  */
-export interface MarkerEdge {
-  from: string;
-  to: string;
-  /** 互逆或平行的边会弯曲，按两侧各外扩一段的带状区域避让 */
-  curved: boolean;
-}
-/** 弯曲的边离两点连线的最大偏移（与 GraphView 中 control-point-step-size 一致） */
-export const CURVE_BAND = 36;
-
 /** 点到线段的距离 */
 export function segmentDistance(p: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number {
   const dx = b.x - a.x;
@@ -262,14 +300,13 @@ export function segmentDistance(p: { x: number; y: number }, a: { x: number; y: 
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }
 
-export function placeLoopMarkers(loops: { id: string; nodes: string[] }[], boxes: Map<string, Box>, edges: MarkerEdge[] = []): Positions {
+/**
+ * paths：各条边路由之后的实际路径（采样点），标记要与之保持距离。
+ */
+export function placeLoopMarkers(loops: { id: string; nodes: string[] }[], boxes: Map<string, Box>, paths: { x: number; y: number }[][] = []): Positions {
   const out: Positions = {};
   const r = MARKER_R + 8;
-  const segs = edges.flatMap((e) => {
-    const a = boxes.get(e.from);
-    const b = boxes.get(e.to);
-    return a && b ? [{ a, b, clearance: MARKER_R + 4 + (e.curved ? CURVE_BAND : 0) }] : [];
-  });
+  const segs = paths.flatMap((p) => p.slice(1).map((q, i) => ({ a: p[i]!, b: q, clearance: MARKER_R + 4 })));
   const free = (x: number, y: number) =>
     [...boxes.values()].every((b) => Math.abs(x - b.x) >= b.w / 2 + r || Math.abs(y - b.y) >= b.h / 2 + r) &&
     Object.values(out).every((m) => Math.hypot(m.x - x, m.y - y) >= 2 * r) &&
@@ -292,19 +329,9 @@ export function placeLoopMarkers(loops: { id: string; nodes: string[] }[], boxes
   return out;
 }
 
-/** 图中参与计算的边，标出哪些会弯曲（同一对变量之间有多条边） */
-export function markerEdges(graph: Graph, showRejected = false): MarkerEdge[] {
-  const live = new Set(layoutNodes(graph, showRejected).map((n) => n.id));
-  const edges = graph.edges.filter((e) => (showRejected || e.status !== "rejected") && live.has(e.from) && live.has(e.to));
-  const key = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
-  const count = new Map<string, number>();
-  for (const e of edges) count.set(key(e.from, e.to), (count.get(key(e.from, e.to)) ?? 0) + 1);
-  return edges.map((e) => ({ from: e.from, to: e.to, curved: (count.get(key(e.from, e.to)) ?? 0) > 1 }));
-}
-
 /** 回路标记的显示策略：回路不多时全部显示；较多时只显示选中或悬停的那个 */
 export const MAX_ALWAYS_SHOWN_LOOPS = 2;
-export function visibleLoopIds(loopIds: string[], highlighted: string | null, hovered: string | null): string[] {
-  if (loopIds.length <= MAX_ALWAYS_SHOWN_LOOPS) return loopIds;
+export function visibleLoopIds(loopIds: string[], highlighted: string | null, hovered: string | null, showAll = false): string[] {
+  if (showAll || loopIds.length <= MAX_ALWAYS_SHOWN_LOOPS) return loopIds;
   return loopIds.filter((id) => id === highlighted || id === hovered);
 }

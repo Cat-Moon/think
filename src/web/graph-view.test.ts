@@ -20,6 +20,8 @@ const props = (over: Partial<GraphViewProps> = {}): GraphViewProps => {
     onSelect: () => undefined,
     highlightLoop: null,
     hoverLoop: null,
+    showAllLoops: false,
+    onToggleAllLoops: () => undefined,
     onLoopClick: () => undefined,
     showRejected: true,
     ...over,
