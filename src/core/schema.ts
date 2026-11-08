@@ -208,6 +208,39 @@ export const Version = z
   })
   .refine((v) => v.graph.version === v.version, { message: "版本号与图中的 version 不一致", path: ["graph", "version"] });
 
+// ---------- 工作区与 Map 文件（第 9.4、9.5 节） ----------
+
+export const WorkspaceConfig = z.object({
+  schema_version: z.literal(SCHEMA_VERSION),
+  default_model: z.string().default("sonnet"),
+  privacy_notice_seen: z.boolean().default(false),
+});
+
+export const MapMeta = z.object({
+  schema_version: z.number().int().min(1),
+  title: z.string().trim().min(1),
+  created_at: z.iso.datetime(),
+  updated_at: z.iso.datetime(),
+  /** 分叉来源：源 Map 的文件夹名和版本 */
+  parent: z.object({ map: z.string(), version: VersionId }).nullable().default(null),
+  archived: z.boolean().default(false),
+});
+
+export const Layout = z.object({
+  positions: z.record(NodeId, z.object({ x: z.number(), y: z.number() })).default({}),
+});
+
+export const Turn = z.object({
+  turn_id: TurnId,
+  role: z.enum(["user", "ai", "system"]),
+  kind: z.enum(["clarify", "patch", "answer"]).optional(),
+  text: z.string(),
+  question: z.string().optional(),
+  patch_id: PatchId.optional(),
+  version: VersionId.optional(),
+  created_at: z.iso.datetime(),
+});
+
 // ---------- AI 输出（第 5.5 节） ----------
 // 结构由 CLI 的 --json-schema 保证；内容规则（引用存在、≤3 个新增等）由 M3 的代码校验。
 
@@ -239,3 +272,7 @@ export type Origin = z.infer<typeof Origin>;
 export type EdgeStatus = z.infer<typeof EdgeStatus>;
 export type Version = z.infer<typeof Version>;
 export type AiOutput = z.infer<typeof AiOutput>;
+export type WorkspaceConfig = z.infer<typeof WorkspaceConfig>;
+export type MapMeta = z.infer<typeof MapMeta>;
+export type Layout = z.infer<typeof Layout>;
+export type Turn = z.infer<typeof Turn>;

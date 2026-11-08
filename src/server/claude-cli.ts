@@ -1,7 +1,7 @@
 // 调用本机 Claude Code CLI 的最小封装（设计文档第 8.1 节）。
 // M3 会在此基础上加上校验、重试、日志等。
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 
@@ -80,12 +80,16 @@ export function callClaude(opts: ClaudeCallOptions): Promise<ClaudeRawResult> {
     child.stdout.setEncoding("utf8").on("data", (d: string) => (stdout += d));
     child.stderr.setEncoding("utf8").on("data", (d: string) => (stderr += d));
     const timer = setTimeout(() => child.kill(), opts.timeoutMs ?? 180_000);
-    child.on("error", (e) => {
+    const cleanup = () => {
       clearTimeout(timer);
+      rmSync(cwd, { recursive: true, force: true });
+    };
+    child.on("error", (e) => {
+      cleanup();
       reject(e);
     });
     child.on("close", (exitCode) => {
-      clearTimeout(timer);
+      cleanup();
       let json: Record<string, unknown> | null = null;
       try {
         json = JSON.parse(stdout) as Record<string, unknown>;
