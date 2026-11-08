@@ -1,0 +1,22 @@
+# 依赖与构建产物
+node_modules/
+dist/
+*.tsbuildinfo
+
+# 环境变量与密钥
+.env
+.env.*
+
+# 工作区数据与日志（含个人对话内容，不能提交）
+workspace/
+maps/
+logs/
+*.jsonl
+*.log
+
+# 编辑器 / 系统
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
