@@ -1,4 +1,5 @@
 // ClaudeCodeProvider：通过本机已登录的 Claude Code CLI 调用（设计文档第 8.1 节）。
+import { parseRateLimitEvent, type LastRateLimit } from "../claude-usage";
 import { parseStream, printArgs, runClaude, type RunResult } from "../claude-cli";
 import { ERROR_TEXT, ZERO_USAGE, type AgentProvider, type LLMErrorKind, type LLMRequest, type LLMResponse, type Progress, type ProviderStatus, type Usage } from "./provider";
 
@@ -76,6 +77,7 @@ export function classify(run: RunResult): { kind: LLMErrorKind; message: string 
 
 export class ClaudeCodeProvider implements AgentProvider {
   name = "claude-code";
+  lastRateLimit: LastRateLimit | null = null;
 
   async healthCheck(): Promise<ProviderStatus> {
     const apiKeyEnvSet = "ANTHROPIC_API_KEY" in process.env;
@@ -119,6 +121,8 @@ export class ClaudeCodeProvider implements AgentProvider {
     const durationMs = Date.now() - t0;
     const error = classify(run);
     const parsed = parseStream(run.stdout);
+    // 记下最近一次的额度状态（不需要额外调用）
+    this.lastRateLimit = parseRateLimitEvent(parsed.rateLimit, new Date().toISOString()) ?? this.lastRateLimit;
     // 日志只记 result 行、格式校验错误和额度信息，不记整个事件流
     const raw = parsed.result
       ? { ...parsed.result, structured_output_errors: parsed.structuredErrors, structured_output_attempts: parsed.structuredAttempts, rate_limit_event: parsed.rateLimit }

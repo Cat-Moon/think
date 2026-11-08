@@ -12,6 +12,11 @@ export interface Busy {
   retryReason?: string;
   /** 正在发送的消息（服务端保存前先显示出来） */
   text?: string;
+  /** 排队中（全局同时进行的回合已满） */
+  queued?: boolean;
+  /** 排队中：第几个 */
+  position?: number;
+  maxParallel?: number;
 }
 
 function useSeconds(since: number | null) {
@@ -117,7 +122,15 @@ export function ChatLog(props: {
         ),
       )}
       {busy?.text && <div className="msg user pending">{busy.text}</div>}
-      {busy && (
+      {busy?.queued && (
+        <div className="msg ai thinking queued">
+          ⏳ 排队中：同时最多 {busy.maxParallel ?? 2} 个图在思考{busy.position ? `，你排在第 ${busy.position} 个` : ""} · {secs} 秒
+          <button className="cancel" onClick={props.onCancel}>
+            取消
+          </button>
+        </div>
+      )}
+      {busy && !busy.queued && (
         <div className="msg ai thinking">
           <span className="dots" aria-hidden>
             ●●●

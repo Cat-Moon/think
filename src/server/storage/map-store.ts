@@ -26,7 +26,7 @@ import {
   type Version,
 } from "../../core/schema";
 import { initialVersion, nextVersion, restoreVersion } from "../../core/version";
-import { StorageError, appendJsonl, atomicWrite, readJson, readJsonl, writeJson, writeJsonNew, type JsonlResult } from "./fsutil";
+import { StorageError, appendJsonl, atomicWrite, readFileRetry, readJson, readJsonl, writeJson, writeJsonNew, type JsonlResult } from "./fsutil";
 import { migrateMapFolder } from "./migrate";
 
 export const paths = (dir: string) => ({
@@ -287,7 +287,7 @@ export async function abandonLastMessage(dir: string, now: string): Promise<Turn
 // ---------- 笔记与布局 ----------
 
 export async function readNotes(dir: string): Promise<string> {
-  return existsSync(paths(dir).notes) ? readFile(paths(dir).notes, "utf8") : "";
+  return existsSync(paths(dir).notes) ? readFileRetry(paths(dir).notes) : "";
 }
 
 export async function writeNotes(dir: string, text: string, now: string): Promise<void> {

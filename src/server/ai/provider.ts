@@ -56,6 +56,8 @@ export interface AgentProvider {
   name: string;
   healthCheck(): Promise<ProviderStatus>;
   complete(req: LLMRequest): Promise<LLMResponse>;
+  /** 最近一次调用时 CLI 报告的额度状态（没有则为 null） */
+  lastRateLimit?: import("../claude-usage").LastRateLimit | null;
 }
 
 export const ZERO_USAGE: Usage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };

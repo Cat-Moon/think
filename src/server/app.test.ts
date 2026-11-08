@@ -4,7 +4,9 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AiOutput } from "../core/schema";
 import { FakeProvider, type FakeStep } from "./ai/fake-provider";
-import type { MapListResponse, MapState, StatusResponse, TurnStreamEvent } from "./api";
+import { existsSync, readdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import type { JobView, MapListResponse, MapState, StatusResponse, TrashEntry } from "./api";
 import { createApp } from "./app";
 import { tmpRoot } from "./storage/testutil";
 
@@ -27,10 +29,12 @@ afterEach(() => {
   for (const s of servers.splice(0)) s.close();
 });
 
-async function start(steps: FakeStep[]) {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function start(steps: FakeStep[], opts: { maxParallel?: number; now?: () => string } = {}) {
   const root = tmpRoot();
   const provider = new FakeProvider(steps);
-  const server = createServer(createApp({ root, provider }));
+  const server = createServer(createApp({ root, provider, ...opts }));
   servers.push(server);
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -38,14 +42,25 @@ async function start(steps: FakeStep[]) {
     const res = await fetch(base + path, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
     return { status: res.status, body: (await res.json()) as T };
   };
-  const turn = async (name: string, text?: string, signal?: AbortSignal): Promise<TurnStreamEvent[]> => {
-    const res = await fetch(`${base}/api/maps/${encodeURIComponent(name)}/turn`, { method: "POST", body: JSON.stringify(text === undefined ? {} : { text }), signal });
-    return (await res.text())
-      .trim()
-      .split("\n")
-      .map((l) => JSON.parse(l) as TurnStreamEvent);
+  const jobs = async () => (await call<Record<string, JobView>>("GET", "/api/jobs")).body;
+  /** 开始一轮（立即返回）；不能开始时返回状态码和原因 */
+  const startTurn = (name: string, text?: string) => call<{ ok?: boolean; error?: string }>("POST", `/api/maps/${encodeURIComponent(name)}/turn`, text === undefined ? {} : { text });
+  /** 等到这个图没有进行中的回合；返回失败的记录（成功则为 undefined） */
+  const waitIdle = async (name: string) => {
+    for (;;) {
+      const j = (await jobs())[name];
+      if (!j || j.state === "failed") return j;
+      await sleep(15);
+    }
   };
-  return { root, provider, base, call, turn };
+  /** 开始一轮并等它结束 */
+  const turn = async (name: string, text?: string) => {
+    const r = await startTurn(name, text);
+    if (r.status !== 200) return { started: false as const, status: r.status, error: r.body.error };
+    const failed = await waitIdle(name);
+    return { started: true as const, ok: !failed, job: failed };
+  };
+  return { root, provider, base, call, turn, startTurn, waitIdle, jobs };
 }
 
 describe("HTTP API", () => {
@@ -56,11 +71,8 @@ describe("HTTP API", () => {
     const name = created.body.name;
     expect((await call<MapListResponse>("GET", "/api/maps")).body.maps.map((m) => m.name)).toEqual([name]);
 
-    // AI 回合：流式进度 + 最后一行结果
-    const events = await turn(name, "为什么我总是拖延");
-    expect(events[0]).toMatchObject({ type: "attempt", attempt: 1 });
-    expect(events.some((e) => e.type === "progress")).toBe(true);
-    expect(events.at(-1)).toMatchObject({ type: "done", ok: true });
+    // AI 回合：在服务端排队执行
+    expect(await turn(name, "为什么我总是拖延")).toMatchObject({ started: true, ok: true });
     let s = (await call<MapState>("GET", `/api/maps/${encodeURIComponent(name)}`)).body;
     expect(s.turns.map((t) => t.role)).toEqual(["user", "ai"]);
     const pending = s.patches.find((p) => p.resolution === null)!;
@@ -126,20 +138,28 @@ describe("HTTP API", () => {
     expect((await call("PUT", "/api/settings", { show_new_loops: "yes" })).status).toBe(400);
   });
 
-  it("取消：断开连接即终止调用，用户消息已保存，之后可以重试", async () => {
-    const { call, turn } = await start([{ hang: true }, { output: seed }]);
+  it("取消：终止调用，用户消息已保存，之后可以重试；进行中不能修改图", async () => {
+    const { call, turn, startTurn, waitIdle, jobs } = await start([{ hang: true }, { output: seed }]);
     const { name } = (await call<{ name: string }>("POST", "/api/maps", { topic: "拖延" })).body;
-    const ac = new AbortController();
-    const pending = turn(name, "为什么我总是拖延", ac.signal).catch((e: Error) => e);
-    await new Promise((r) => setTimeout(r, 100));
-    ac.abort();
-    expect(await pending).toBeInstanceOf(Error);
-    await new Promise((r) => setTimeout(r, 100));
+    expect((await startTurn(name, "为什么我总是拖延")).status).toBe(200);
+    await sleep(50);
+    expect((await jobs())[name]).toMatchObject({ state: "running" });
+    // 进行中也能马上打开这个图，看到已保存的消息（读取不等 AI 回复）
+    const t0 = Date.now();
+    const during = (await call<MapState>("GET", `/api/maps/${encodeURIComponent(name)}`)).body;
+    expect(Date.now() - t0).toBeLessThan(1000);
+    expect(during.turns.map((t) => t.role)).toEqual(["user"]);
+    // 进行中：不能再发、不能编辑、不能删除
+    expect((await startTurn(name, "再来一条")).status).toBe(409);
+    expect((await call("POST", `/api/maps/${encodeURIComponent(name)}/edit`, { ops: [{ op: "add_node", ref: "$x", label: "睡眠" }] })).status).toBe(409);
+    expect((await call("DELETE", `/api/maps/${encodeURIComponent(name)}`)).status).toBe(409);
+    await call("POST", `/api/maps/${encodeURIComponent(name)}/turn/cancel`);
+    expect(await waitIdle(name)).toMatchObject({ state: "failed", error: { kind: "cancelled" } });
     let s = (await call<MapState>("GET", `/api/maps/${encodeURIComponent(name)}`)).body;
     expect(s.turns.map((t) => t.role)).toEqual(["user"]); // 输入没有丢
 
-    const events = await turn(name); // 重试：不带新消息
-    expect(events.at(-1)).toMatchObject({ type: "done", ok: true });
+    expect(await turn(name)).toMatchObject({ ok: true }); // 重试：不带新消息
+    expect((await jobs())[name]).toBeUndefined();
     s = (await call<MapState>("GET", `/api/maps/${encodeURIComponent(name)}`)).body;
     expect(s.turns.map((t) => [t.role, t.text])).toEqual([
       ["user", "为什么我总是拖延"],
@@ -150,8 +170,9 @@ describe("HTTP API", () => {
   it("失败时返回原因和 saved；名称不合法或不存在时报错", async () => {
     const { call, turn } = await start([{ error: { kind: "rate_limit", message: "额度用完" } }]);
     const { name } = (await call<{ name: string }>("POST", "/api/maps", { topic: "拖延" })).body;
-    expect((await turn(name, "你好")).at(-1)).toMatchObject({ type: "done", ok: false, saved: true, error: { kind: "rate_limit" } });
-    expect((await turn(name, "   ")).at(-1)).toMatchObject({ type: "done", ok: false, saved: false });
+    expect(await turn(name, "你好")).toMatchObject({ started: true, ok: false, job: { state: "failed", error: { kind: "rate_limit" } } });
+    expect((await call<MapListResponse>("GET", "/api/maps")).body.maps[0]).toMatchObject({ awaitingReply: true });
+    expect(await turn(name, "   ")).toMatchObject({ started: false, status: 409, error: "消息不能为空" });
     expect((await call("GET", "/api/maps/..%2F..")).status).toBe(400);
     expect((await call("GET", "/api/maps/nope")).status).toBe(404);
   });
@@ -162,7 +183,7 @@ describe("放弃没有回复的消息", () => {
     const resetsAt = "2026-11-09T05:30:00.000Z";
     const { call, turn, provider } = await start([{ error: { kind: "rate_limit", message: "额度用完", resetsAt } }, { output: seed }]);
     const { name } = (await call<{ name: string }>("POST", "/api/maps", { topic: "拖延" })).body;
-    expect((await turn(name, "这条会失败")).at(-1)).toMatchObject({ type: "done", ok: false, error: { kind: "rate_limit", resetsAt } });
+    expect(await turn(name, "这条会失败")).toMatchObject({ ok: false, job: { error: { kind: "rate_limit", resetsAt } } });
 
     expect((await call("POST", `/api/maps/${encodeURIComponent(name)}/abandon`)).status).toBe(200);
     let s = (await call<MapState>("GET", `/api/maps/${encodeURIComponent(name)}`)).body;
@@ -170,14 +191,112 @@ describe("放弃没有回复的消息", () => {
       ["user", null],
       ["system", "t001"],
     ]);
-    expect((await turn(name)).at(-1)).toMatchObject({ ok: false, saved: false }); // 没有可以重试的消息
+    expect(await turn(name)).toMatchObject({ started: false, status: 409 }); // 没有可以重试的消息
     expect((await call("POST", `/api/maps/${encodeURIComponent(name)}/abandon`)).status).toBe(400); // 也没有可以放弃的
 
-    expect((await turn(name, "改写后的消息")).at(-1)).toMatchObject({ ok: true });
+    expect(await turn(name, "改写后的消息")).toMatchObject({ ok: true });
     const prompt = provider.requests.at(-1)!.prompt;
     expect(prompt).toContain("改写后的消息");
     expect(prompt).not.toContain("这条会失败");
     s = (await call<MapState>("GET", `/api/maps/${encodeURIComponent(name)}`)).body;
     expect(s.turns.map((t) => t.role)).toEqual(["user", "system", "user", "ai"]);
+  });
+});
+
+describe("工作台：多个图并行、排队", () => {
+  it("全局最多 2 个回合同时进行，其余排队；取消排队中的不会调用 AI；结束后排队的接着执行", async () => {
+    const clarify: AiOutput = { kind: "clarify", message: "先确认一下。", question: "你指的是哪种变化？", ops: [], possible_duplicates: [] };
+    const { call, startTurn, waitIdle, jobs, provider } = await start([{ hang: true }, { hang: true }, { output: clarify }]);
+    const names: string[] = [];
+    for (const t of ["房价", "拖延", "交通", "选举"]) names.push((await call<{ name: string }>("POST", "/api/maps", { topic: t })).body.name);
+    const [a, b, c, d] = names as [string, string, string, string];
+    for (const n of names) expect((await startTurn(n, "你好")).status).toBe(200);
+    await sleep(50);
+    let j = await jobs();
+    expect([j[a]!.state, j[b]!.state, j[c]!.state, j[d]!.state]).toEqual(["running", "running", "queued", "queued"]);
+    expect([j[c]!.position, j[d]!.position]).toEqual([1, 2]);
+    expect(provider.requests).toHaveLength(2);
+
+    // 取消排队中的 d：不调用 AI，消息已保存，可以重试或放弃
+    await call("POST", `/api/maps/${encodeURIComponent(d)}/turn/cancel`);
+    j = await jobs();
+    expect(j[d]).toMatchObject({ state: "failed", error: { kind: "cancelled" } });
+    expect((await call<MapState>("GET", `/api/maps/${encodeURIComponent(d)}`)).body.turns.map((t) => t.role)).toEqual(["user"]);
+
+    // 取消 a：c 接着执行（拿到 clarify），b 仍在执行
+    await call("POST", `/api/maps/${encodeURIComponent(a)}/turn/cancel`);
+    expect(await waitIdle(c)).toBeUndefined();
+    expect((await jobs())[b]).toMatchObject({ state: "running" });
+    expect(provider.requests).toHaveLength(3);
+    await call("POST", `/api/maps/${encodeURIComponent(b)}/turn/cancel`);
+    expect(await waitIdle(b)).toMatchObject({ error: { kind: "cancelled" } });
+    expect((await call<MapState>("GET", `/api/maps/${encodeURIComponent(c)}`)).body.turns.map((t) => t.role)).toEqual(["user", "ai"]);
+  });
+
+  it("列表概况：变量数、回路数、待处理的建议", async () => {
+    const { call, turn } = await start([{ output: seed }]);
+    const { name } = (await call<{ name: string }>("POST", "/api/maps", { topic: "拖延" })).body;
+    await turn(name, "为什么我总是拖延");
+    let m = (await call<MapListResponse>("GET", "/api/maps")).body.maps[0]!;
+    expect(m).toMatchObject({ nodes: 0, loops: 0, pending: true, awaitingReply: false });
+    await call("POST", `/api/maps/${encodeURIComponent(name)}/patches/p001`, { choices: "all" });
+    await call("POST", `/api/maps/${encodeURIComponent(name)}/edit`, { ops: [{ op: "add_edge", from: "n2", to: "n1", polarity: "+", rationale: "" }] });
+    m = (await call<MapListResponse>("GET", "/api/maps")).body.maps[0]!;
+    expect(m).toMatchObject({ nodes: 3, loops: 1, pending: false });
+  });
+});
+
+describe("工作台：重命名、删除到回收站、撤销", () => {
+  it("重命名只改标题；删除移到 .trash/，可以撤销；超过 30 天的清理掉", async () => {
+    let clock = "2026-11-09T01:00:00.000Z";
+    const { call, root } = await start([], { now: () => clock });
+    const { name } = (await call<{ name: string }>("POST", "/api/maps", { topic: "拖延" })).body;
+    expect((await call("POST", `/api/maps/${encodeURIComponent(name)}/rename`, { title: "为什么我总是拖延" })).status).toBe(200);
+    expect((await call<MapListResponse>("GET", "/api/maps")).body.maps.map((m) => [m.name, m.meta.title])).toEqual([[name, "为什么我总是拖延"]]);
+
+    const del = await call<{ entry: string }>("DELETE", `/api/maps/${encodeURIComponent(name)}`);
+    expect(del.status).toBe(200);
+    expect((await call<MapListResponse>("GET", "/api/maps")).body.maps).toEqual([]);
+    expect(existsSync(join(root, ".trash", del.body.entry, "map.json"))).toBe(true); // 文件还在
+    const trash = (await call<{ entries: TrashEntry[] }>("GET", "/api/trash")).body.entries;
+    expect(trash).toMatchObject([{ name, title: "为什么我总是拖延", deletedAt: clock }]);
+
+    // 撤销
+    expect((await call<{ name: string }>("POST", `/api/trash/${encodeURIComponent(del.body.entry)}/restore`)).body.name).toBe(name);
+    expect((await call<MapListResponse>("GET", "/api/maps")).body.maps).toHaveLength(1);
+    expect((await call("POST", "/api/trash/..%2Fmaps/restore")).status).toBe(400);
+
+    // 删除后 31 天：下次删除时清理旧的
+    const old = (await call<{ entry: string }>("DELETE", `/api/maps/${encodeURIComponent(name)}`)).body.entry;
+    clock = "2026-12-10T01:00:00.000Z";
+    const other = (await call<{ name: string }>("POST", "/api/maps", { topic: "交通" })).body.name;
+    await call("DELETE", `/api/maps/${encodeURIComponent(other)}`);
+    const left = readdirSync(join(root, ".trash"));
+    expect(left).not.toContain(old);
+    expect(left).toHaveLength(1);
+  });
+});
+
+describe("额度信息（不调用模型）", () => {
+  it("读取 Claude Code 本地缓存中的利用率和重置时间；没有或格式不对时为 null", async () => {
+    const file = join(tmpRoot(), "claude.json");
+    process.env.THINK_CLAUDE_STATE = file;
+    try {
+      const { call } = await start([]);
+      expect((await call<StatusResponse>("GET", "/api/status")).body.usage).toBeNull();
+      writeFileSync(
+        file,
+        JSON.stringify({
+          oauthAccount: { emailAddress: "不应被读取" },
+          cachedUsageUtilization: { fetchedAtMs: Date.parse("2026-11-08T07:46:48.520Z"), utilization: { five_hour: { utilization: 93, resets_at: "2026-11-08T10:30:00.583824+00:00" }, seven_day: { utilization: 46, resets_at: null } } },
+        }),
+      );
+      const st = (await call<StatusResponse>("GET", "/api/status")).body;
+      expect(st.usage).toEqual({ fiveHour: { utilization: 93, resetsAt: "2026-11-08T10:30:00.583Z" }, sevenDay: { utilization: 46, resetsAt: null }, fetchedAt: "2026-11-08T07:46:48.520Z" });
+      expect(JSON.stringify(st)).not.toContain("不应被读取");
+      expect(st.maxParallel).toBe(2);
+    } finally {
+      delete process.env.THINK_CLAUDE_STATE;
+    }
   });
 });

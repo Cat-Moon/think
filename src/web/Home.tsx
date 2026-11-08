@@ -1,67 +1,6 @@
-// Map 列表与新建；首次启动的隐私说明；设置。
-import { useEffect, useState } from "react";
+// 首次启动的隐私说明；设置。
 import type { WorkspaceConfig } from "../core/schema";
-import type { MapListResponse, SettingsUpdate, StatusResponse } from "../server/api";
-import { api } from "./client";
-
-const time = (iso: string) => new Date(iso).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
-
-export function MapList(props: { onOpen: (name: string) => void }) {
-  const [list, setList] = useState<MapListResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [topic, setTopic] = useState("");
-  const [creating, setCreating] = useState(false);
-  useEffect(() => {
-    api.listMaps().then(setList, (e: Error) => setError(e.message));
-  }, []);
-  const create = async () => {
-    if (!topic.trim()) return;
-    setCreating(true);
-    try {
-      const m = await api.createMap(topic.trim());
-      props.onOpen(m.name);
-    } catch (e) {
-      setError((e as Error).message);
-      setCreating(false);
-    }
-  };
-  return (
-    <div className="home">
-      <div className="card">
-        <h3>新建</h3>
-        <p className="hint">写下你想弄明白的现象，例如"为什么我总是拖延"、"城市为什么越修路越堵"。</p>
-        <div className="reason">
-          <input autoFocus value={topic} placeholder="主题" onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void create()} />
-          <button className="primary" disabled={!topic.trim() || creating} onClick={() => void create()}>
-            新建
-          </button>
-        </div>
-      </div>
-      {error && <p className="warn">⚠ {error}</p>}
-      <div className="card">
-        <h3>我的图</h3>
-        {!list && !error && <p className="hint">读取中…</p>}
-        {list?.maps.length === 0 && <p className="hint">还没有。</p>}
-        <ul className="map-list">
-          {list?.maps.map((m) => (
-            <li key={m.name} onClick={() => props.onOpen(m.name)}>
-              <b>{m.meta.title}</b>
-              <span className="meta">
-                {time(m.meta.updated_at)}
-                {m.meta.parent && ` · 分叉自 ${m.meta.parent.map}`}
-              </span>
-            </li>
-          ))}
-        </ul>
-        {list?.broken.map((b) => (
-          <p key={b.name} className="warn">
-            ⚠ 无法读取「{b.name}」：{b.error}
-          </p>
-        ))}
-      </div>
-    </div>
-  );
-}
+import type { SettingsUpdate, StatusResponse } from "../server/api";
 
 /** 首次启动的隐私说明（之后可在设置中再次查看） */
 export function PrivacyNotice(props: { status: StatusResponse; onClose: () => void }) {
@@ -157,6 +96,13 @@ export function Settings(props: { status: StatusResponse; onChange: (s: Settings
             </tr>
           </tbody>
         </table>
+        <p className="meta">
+          额度：
+          {props.status.usage
+            ? `5 小时已用 ${props.status.usage.fiveHour?.utilization ?? "?"}%，7 天已用 ${props.status.usage.sevenDay?.utilization ?? "?"}%（来自 Claude Code 本地缓存，更新于 ${new Date(props.status.usage.fetchedAt).toLocaleString("zh-CN")}；Think 不会为此调用模型）`
+            : "读不到（Claude Code 本地没有缓存的额度信息）"}
+          。同时最多 {props.status.maxParallel} 个图在思考，其余排队。
+        </p>
         <p>
           Claude Code：{p ? p.message : "检测中…"}{" "}
           <button onClick={props.onRecheck}>重新检测</button>

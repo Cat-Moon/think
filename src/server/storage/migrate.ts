@@ -3,7 +3,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { SCHEMA_VERSION } from "../../core/schema";
-import { StorageError } from "./fsutil";
+import { StorageError, readFileRetry } from "./fsutil";
 
 /** 把整个 Map 文件夹从 from 升级到 from + 1。键是 from。 */
 type FolderMigration = (mapDir: string) => Promise<void>;
@@ -19,7 +19,7 @@ export async function migrateMapFolder(mapDir: string, current = SCHEMA_VERSION)
   const metaPath = join(mapDir, "map.json");
   let version: unknown;
   try {
-    version = (JSON.parse(await readFile(metaPath, "utf8")) as { schema_version?: unknown }).schema_version;
+    version = (JSON.parse(await readFileRetry(metaPath)) as { schema_version?: unknown }).schema_version;
   } catch {
     throw new StorageError("无法读取 map.json", metaPath);
   }

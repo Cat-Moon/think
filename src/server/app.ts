@@ -10,7 +10,7 @@ import { PatchError, makePatch, resolvePatch } from "../core/patch";
 import { Layout as LayoutSchema, PatchOp, SCHEMA_VERSION, type Patch } from "../core/schema";
 import type { AgentProvider, ProviderStatus } from "./ai/provider";
 import { TurnError, takeTurn } from "./ai/turn";
-import type { EditRequest, HealthResponse, MapListResponse, MapState, StatusResponse, TurnStreamEvent } from "./api";
+import type { EditRequest, HealthResponse, MapListResponse, MapState, MapSummary, ServerEvent, StatusResponse } from "./api";
 import { StorageError } from "./storage/fsutil";
 import {
   abandonLastMessage,
@@ -28,17 +28,23 @@ import {
   repairMap,
   restoreTo,
   savePatch,
+  updateMeta,
   writeLayout,
   writeNotes,
 } from "./storage/map-store";
 import { migrateMapFolder } from "./storage/migrate";
-import { createMap, listMaps, mapsDir, openWorkspace, saveWorkspaceConfig } from "./storage/workspace";
+import { createMap, listMaps, listTrash, mapsDir, openWorkspace, purgeTrash, restoreFromTrash, saveWorkspaceConfig, trashMap } from "./storage/workspace";
+import { findLoops } from "../core/loops";
+import { readCachedUsage } from "./claude-usage";
+import { TurnJobs } from "./jobs";
 
 export interface AppOptions {
   /** 工作区根目录 */
   root: string;
   provider: AgentProvider;
   now?: () => string;
+  /** 全局同时进行的 AI 回合上限（默认 2） */
+  maxParallel?: number;
 }
 
 class HttpError extends Error {
@@ -59,6 +65,7 @@ const Bodies = {
   notes: z.object({ text: z.string().max(200_000) }),
   layout: LayoutSchema,
   turn: z.object({ text: z.string().max(20_000).optional() }),
+  rename: z.object({ title: z.string().trim().min(1).max(200) }),
   settings: z
     .object({
       effort_short: z.string().max(20).nullable(),
@@ -125,9 +132,32 @@ export async function loadMapState(dir: string, name: string): Promise<MapState>
   };
 }
 
+/** 列表中每个 Map 的概况：变量数、回路数、是否有待处理的建议、是否有没回复的消息 */
+async function summarize(name: string, dir: string, meta: MapSummary["meta"]): Promise<MapSummary> {
+  const graph = await readGraph(dir);
+  const conv = await readConversation(dir);
+  return {
+    name,
+    meta,
+    nodes: graph.nodes.filter((n) => n.status === "accepted").length,
+    loops: findLoops(graph).loops.length,
+    pending: Boolean(await pendingPatch(dir)),
+    awaitingReply: conv.items.at(-1)?.role === "user",
+  };
+}
+
 export function createApp(opts: AppOptions) {
   const { root, provider } = opts;
   const now = opts.now ?? (() => new Date().toISOString());
+
+  // 界面通过 SSE（GET /api/events）接收回合状态和 Map 变化
+  const clients = new Set<ServerResponse>();
+  const broadcast = (e: ServerEvent) => {
+    const data = `data: ${JSON.stringify(e)}\n\n`;
+    for (const c of clients) c.write(data);
+  };
+  // 清理回收站里超过 30 天的
+  void purgeTrash(root, now()).catch(() => undefined);
 
   // Claude Code CLI 状态：启动时检测一次（需要几秒），之后用缓存；?refresh=1 重新检测
   let health: ProviderStatus | null = null;
@@ -150,6 +180,20 @@ export function createApp(opts: AppOptions) {
       run.catch(() => undefined),
     );
     return run;
+  };
+
+  const jobs = new TurnJobs({
+    provider,
+    now,
+    config: () => openWorkspace(root),
+    withLock,
+    maxParallel: opts.maxParallel,
+    onChange: () => broadcast({ type: "jobs", jobs: jobs.views() }),
+    onMapChanged: (name) => broadcast({ type: "map", name }),
+  });
+  /** 有进行中的回合时，不能修改这个图（AI 的建议会基于过期版本） */
+  const assertIdle = (name: string) => {
+    if (jobs.isActive(name)) throw new HttpError(409, "AI 正在这个图里思考，等它回复后再修改，或先取消");
   };
 
   const mapDir = (raw: string) => {
@@ -176,7 +220,14 @@ export function createApp(opts: AppOptions) {
     }
     if (method === "GET" && path === "/api/status") {
       if (url.searchParams.has("refresh")) await checkHealth();
-      const body: StatusResponse = { workspaceDir: root, config: await openWorkspace(root), provider: health };
+      const body: StatusResponse = {
+        workspaceDir: root,
+        config: await openWorkspace(root),
+        provider: health,
+        usage: readCachedUsage(),
+        lastRateLimit: provider.lastRateLimit ?? null,
+        maxParallel: jobs.maxParallel,
+      };
       return json(res, 200, body);
     }
     if (method === "PUT" && path === "/api/settings") {
@@ -189,7 +240,15 @@ export function createApp(opts: AppOptions) {
       if (method === "GET") {
         await openWorkspace(root);
         const list = await listMaps(root);
-        const body: MapListResponse = { maps: list.maps.map((m) => ({ name: m.name, meta: m.meta })), broken: list.broken };
+        const maps: MapSummary[] = [];
+        for (const m of list.maps) {
+          try {
+            maps.push(await summarize(m.name, m.dir, m.meta));
+          } catch (e) {
+            list.broken.push({ name: m.name, error: (e as Error).message });
+          }
+        }
+        const body: MapListResponse = { maps, broken: list.broken };
         return json(res, 200, body);
       }
       if (method === "POST") {
@@ -199,12 +258,51 @@ export function createApp(opts: AppOptions) {
       }
     }
 
+    if (method === "GET" && path === "/api/events") {
+      res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store", Connection: "keep-alive", "X-Accel-Buffering": "no" });
+      res.write(`data: ${JSON.stringify({ type: "jobs", jobs: jobs.views() } satisfies ServerEvent)}\n\n`);
+      clients.add(res);
+      const ping = setInterval(() => res.write(": ping\n\n"), 25_000);
+      res.on("close", () => {
+        clearInterval(ping);
+        clients.delete(res);
+      });
+      return;
+    }
+    if (method === "GET" && path === "/api/jobs") return json(res, 200, jobs.views());
+    if (method === "GET" && path === "/api/trash") return json(res, 200, { entries: await listTrash(root) });
+    const tm = path.match(/^\/api\/trash\/([^/]+)\/restore$/);
+    if (method === "POST" && tm) {
+      const name = await restoreFromTrash(root, decodeURIComponent(tm[1]!));
+      broadcast({ type: "maps" });
+      return json(res, 200, { ok: true, name });
+    }
+
     const m = path.match(/^\/api\/maps\/([^/]+)(\/.*)?$/);
     if (!m) throw new HttpError(404, "not found");
     const { name, dir } = mapDir(m[1]!);
     const sub = m[2] ?? "";
 
     if (method === "GET" && sub === "") return json(res, 200, await withLock(name, () => loadMapState(dir, name)));
+
+    // 重命名：只改 map.json 的标题，文件夹名（Map 的 ID）不变
+    if (method === "POST" && sub === "/rename") {
+      const { title } = parse(Bodies.rename, await readBody(req));
+      const meta = await withLock(name, () => updateMeta(dir, { title }, now()));
+      broadcast({ type: "maps" });
+      return json(res, 200, { ok: true, meta });
+    }
+    // 删除：移到工作区的 .trash/（可以撤销；30 天后清理）
+    if (method === "DELETE" && sub === "") {
+      assertIdle(name);
+      const entry = await withLock(name, async () => {
+        jobs.forget(name);
+        return trashMap(root, name, now());
+      });
+      await purgeTrash(root, now()).catch(() => undefined);
+      broadcast({ type: "maps" });
+      return json(res, 200, { ok: true, entry });
+    }
 
     if (method === "PUT" && sub === "/layout") {
       const layout = parse(Bodies.layout, await readBody(req));
@@ -220,6 +318,7 @@ export function createApp(opts: AppOptions) {
     // 处理 AI 的建议（逐项接受或拒绝，拒绝可带理由）
     const pm = sub.match(/^\/patches\/(p\d{3,})$/);
     if (method === "POST" && pm) {
+      assertIdle(name);
       const { choices } = parse(Bodies.resolve, await readBody(req));
       const r = await withLock(name, () => commitPatch(dir, pm[1]!, choices, now()));
       return json(res, 200, { ok: true, version: r.version?.version ?? null });
@@ -227,6 +326,7 @@ export function createApp(opts: AppOptions) {
 
     // 用户自己的直接编辑：origin: user 的补丁，自动接受
     if (method === "POST" && sub === "/edit") {
+      assertIdle(name);
       const body = parse(Bodies.edit, await readBody(req)) as EditRequest;
       const version = await withLock(name, async () => {
         const pending = await pendingPatch(dir);
@@ -255,12 +355,15 @@ export function createApp(opts: AppOptions) {
 
     // 放弃对话末尾那条没有回复的消息（可改写后重发）
     if (method === "POST" && sub === "/abandon") {
+      assertIdle(name);
+      jobs.dismiss(name);
       const t = await withLock(name, () => abandonLastMessage(dir, now()));
       return json(res, 200, { ok: true, turn: t.turn_id });
     }
 
     // 恢复旧版本：生成一个新版本（历史只增不改）
     if (method === "POST" && sub === "/restore") {
+      assertIdle(name);
       const { version } = parse(Bodies.restore, await readBody(req));
       const v = await withLock(name, async () => {
         if (await pendingPatch(dir)) throw new HttpError(409, "请先处理 AI 的建议，再恢复版本");
@@ -269,38 +372,20 @@ export function createApp(opts: AppOptions) {
       return json(res, 200, { ok: true, version: v.version });
     }
 
-    // AI 回合：NDJSON 流式返回进度，最后一行是结果；客户端断开连接即取消（终止 CLI 子进程）
+    // AI 回合：在服务端排队执行，立即返回；进度和结果通过 /api/events 推送
     if (method === "POST" && sub === "/turn") {
       const { text } = parse(Bodies.turn, await readBody(req));
-      const ac = new AbortController();
-      res.on("close", () => {
-        if (!res.writableEnded) ac.abort();
-      });
-      res.writeHead(200, { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" });
-      const send = (e: TurnStreamEvent) => {
-        if (!res.writableEnded && !res.destroyed) res.write(`${JSON.stringify(e)}\n`);
-      };
+      jobs.dismiss(name);
       try {
-        const config = await openWorkspace(root);
-        const r = await withLock(name, () =>
-          takeTurn(dir, provider, {
-            userText: text,
-            model: config.default_model,
-            effortPolicy: { short: config.effort_short, long: config.effort_long },
-            signal: ac.signal,
-            onEvent: send,
-            now,
-          }),
-        );
-        if (r.ok) send({ type: "done", ok: true, warnings: r.warnings.map((w) => w.message) });
-        else send({ type: "done", ok: false, error: r.error, saved: true, violations: r.violations?.map((v) => v.message) });
+        await jobs.start(name, dir, text);
       } catch (e) {
-        const msg = e instanceof TurnError || e instanceof StorageError ? e.message : `出错了：${(e as Error).message}`;
-        send({ type: "done", ok: false, error: { kind: "rejected", message: msg }, saved: false });
+        if (e instanceof TurnError) throw new HttpError(409, e.message);
+        throw e;
       }
-      res.end();
-      return;
+      broadcast({ type: "map", name });
+      return json(res, 200, { ok: true });
     }
+    if (method === "POST" && sub === "/turn/cancel") return json(res, 200, { ok: jobs.cancel(name) });
 
     throw new HttpError(404, "not found");
   }

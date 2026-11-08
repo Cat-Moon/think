@@ -247,7 +247,11 @@ export function GraphView(props: GraphViewProps) {
     // 新的实例总要缩放一次（开发模式下 StrictMode 会销毁并重建实例）
     needsFit.current = true;
     // 开发时供截图脚本核对几何（控制点、标签位置）
-    if (import.meta.env.DEV) (window as unknown as { __cy?: Core }).__cy = cy;
+    if (import.meta.env.DEV) {
+      (window as unknown as { __cy?: Core }).__cy = cy;
+      // 打开多个标签时，每个画布各有一个实例：挂在容器上，检查脚本取当前显示的那个
+      if (container.current) (container.current as unknown as { __cy?: Core }).__cy = cy;
+    }
     cy.on("tap", "node.var", (e) => {
       const p = propsRef.current;
       const id = e.target.id() as string;

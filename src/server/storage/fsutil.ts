@@ -42,11 +42,26 @@ export async function writeJson(path: string, value: unknown): Promise<void> {
   await atomicWrite(path, JSON.stringify(value, null, 2) + "\n");
 }
 
+/**
+ * 读文件。Windows 上另一个请求正在原子替换这个文件时，读取可能短暂失败（EPERM / EBUSY / EACCES）：重试几次。
+ */
+export async function readFileRetry(path: string): Promise<string> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await readFile(path, "utf8");
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (attempt >= 4 || (code !== "EPERM" && code !== "EBUSY" && code !== "EACCES")) throw e;
+      await new Promise((r) => setTimeout(r, 30 * (attempt + 1)));
+    }
+  }
+}
+
 /** 读取并按模式校验 JSON 文件 */
 export async function readJson<S extends z.ZodType>(path: string, schema: S): Promise<z.output<S>> {
   let raw: string;
   try {
-    raw = await readFile(path, "utf8");
+    raw = await readFileRetry(path);
   } catch (e) {
     throw new StorageError(`无法读取文件：${(e as Error).message}`, path);
   }
@@ -99,7 +114,7 @@ export interface JsonlResult<T> {
 /** 读取 JSONL：逐行解析，坏行跳过并记录，不影响其他行 */
 export async function readJsonl<S extends z.ZodType>(path: string, schema: S): Promise<JsonlResult<z.output<S>>> {
   if (!existsSync(path)) return { items: [], skipped: [] };
-  const lines = (await readFile(path, "utf8")).split("\n");
+  const lines = (await readFileRetry(path)).split("\n");
   const result: JsonlResult<z.output<S>> = { items: [], skipped: [] };
   lines.forEach((line, i) => {
     const text = line.replace(/\r$/, "");

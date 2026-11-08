@@ -6,18 +6,57 @@
       "message": "先从三个变量开始：焦虑、回避和任务难度。这些关系都是假设，可能不对。",
       "question": "你拖延的时候，更常见的感受是焦虑还是无聊？",
       "ops": [
-        { "op": "set_frame", "phenomenon": "重要的事一拖再拖", "perspective": "个人", "time_horizon": "几周", "context": "未指定" },
-        { "op": "add_node", "ref": "$a", "label": "焦虑程度" },
-        { "op": "add_node", "ref": "$b", "label": "回避行为" },
-        { "op": "add_node", "ref": "$c", "label": "任务难度" },
-        { "op": "add_edge", "from": "$a", "to": "$b", "polarity": "+", "rationale": "焦虑时更想逃开让人不舒服的任务。" },
-        { "op": "add_edge", "from": "$c", "to": "$a", "polarity": "+", "rationale": "任务越难，越容易担心做不好。" },
-        { "op": "add_edge", "from": "$b", "to": "$a", "polarity": "+", "rationale": "拖得越久，截止日期越近，焦虑越高。", "delay": true }
+        {
+          "op": "set_frame",
+          "phenomenon": "重要的事一拖再拖",
+          "perspective": "个人",
+          "time_horizon": "几周",
+          "context": "未指定"
+        },
+        {
+          "op": "add_node",
+          "ref": "$a",
+          "label": "焦虑程度"
+        },
+        {
+          "op": "add_node",
+          "ref": "$b",
+          "label": "回避行为"
+        },
+        {
+          "op": "add_node",
+          "ref": "$c",
+          "label": "任务难度"
+        },
+        {
+          "op": "add_edge",
+          "from": "$a",
+          "to": "$b",
+          "polarity": "+",
+          "rationale": "焦虑时更想逃开让人不舒服的任务。"
+        },
+        {
+          "op": "add_edge",
+          "from": "$c",
+          "to": "$a",
+          "polarity": "+",
+          "rationale": "任务越难，越容易担心做不好。"
+        },
+        {
+          "op": "add_edge",
+          "from": "$b",
+          "to": "$a",
+          "polarity": "+",
+          "rationale": "拖得越久，截止日期越近，焦虑越高。",
+          "delay": true
+        }
       ],
       "possible_duplicates": []
     }
   },
-  { "hang": true },
+  {
+    "hang": true
+  },
   {
     "delayMs": 1500,
     "output": {
@@ -28,5 +67,47 @@
       "possible_duplicates": []
     }
   },
-  { "error": { "kind": "rate_limit", "message": "订阅额度已用完或请求过于频繁，请稍后再试", "resetsAt": "2030-01-01T09:30:00.000Z" } }
+  {
+    "error": {
+      "kind": "rate_limit",
+      "message": "订阅额度已用完或请求过于频繁，请稍后再试",
+      "resetsAt": "2030-01-01T09:30:00.000Z"
+    }
+  },
+  {
+    "delayMs": 8000,
+    "output": {
+      "kind": "clarify",
+      "message": "先确认一下你关心的现象。",
+      "question": "你想弄明白的是哪种变化？",
+      "ops": [],
+      "possible_duplicates": []
+    }
+  },
+  {
+    "delayMs": 8000,
+    "output": {
+      "kind": "clarify",
+      "message": "先确认一下你关心的现象。",
+      "question": "你想弄明白的是哪种变化？",
+      "ops": [],
+      "possible_duplicates": []
+    }
+  },
+  {
+    "delayMs": 2000,
+    "output": {
+      "kind": "clarify",
+      "message": "先确认一下你关心的现象。",
+      "question": "你想弄明白的是哪种变化？",
+      "ops": [],
+      "possible_duplicates": []
+    }
+  },
+  {
+    "hang": true
+  },
+  {
+    "hang": true
+  }
 ]

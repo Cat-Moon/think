@@ -30,8 +30,8 @@ function InlineInput(props: { initial?: string; placeholder: string; confirm: st
 export function SelectionPanel(props: {
   graph: Graph;
   selection: Selection;
-  /** 有待处理的 AI 建议时不能直接编辑 */
-  locked: boolean;
+  /** 不能直接编辑的原因（有待处理的 AI 建议、AI 正在思考）；可以编辑时为 null */
+  locked: string | null;
   readOnly: boolean;
   onEdit: (ops: PatchOp[]) => void;
   onClose: () => void;
@@ -52,7 +52,7 @@ export function SelectionPanel(props: {
     props.onEdit(ops);
     setMode(null);
   };
-  const blocked = readOnly ? <p className="hint">正在查看旧版本（只读）。</p> : locked ? <p className="hint">先处理 AI 的建议，再修改图。</p> : null;
+  const blocked = readOnly ? <p className="hint">正在查看旧版本（只读）。</p> : locked ? <p className="hint">{locked}</p> : null;
 
   const label = labeler(graph);
   if (selection.kind === "node") {

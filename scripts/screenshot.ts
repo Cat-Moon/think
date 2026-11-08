@@ -10,7 +10,7 @@ import { controlPoint, edgePath, pointAt } from "../src/web/routing";
 /** 核对浏览器里 Cytoscape 实际的控制点与 routing.ts 的计算是否一致（同时打印标签相关字段，便于核对标签位置） */
 async function verifyGeometry(page: import("playwright-core").Page, name: string, probe: boolean) {
   const edges = await page.evaluate(() => {
-    const cy = (window as unknown as { __cy: import("cytoscape").Core }).__cy;
+    const cy = (document.querySelector(".tab-pane:not(.hidden) .graph") as unknown as { __cy: import("cytoscape").Core }).__cy;
     return cy.edges().map((e) => {
       const rs = (e as unknown as { _private: { rscratch: Record<string, unknown> } })._private.rscratch;
       return {
@@ -76,8 +76,10 @@ const api = (method: string, path: string, body?: unknown) =>
 const openMap = async (t: string) => {
   // 默认布局：清空已保存的位置
   await api("PUT", `/api/maps/${encodeURIComponent(index[t]!)}/layout`, { positions: {} });
+  // 只打开这一个标签（截图看的是默认布局）
+  if (page.url().startsWith(UI)) await page.evaluate(() => localStorage.setItem("think-tabs", "[]"));
   await page.goto(mapUrl(t));
-  await page.waitForSelector(".graph canvas");
+  await page.waitForSelector(".tab-pane:not(.hidden) .graph canvas");
   await page.waitForTimeout(900);
 };
 
@@ -115,29 +117,26 @@ await shot("layout-demo-all-loops");
 await page.click(".loop-hint");
 
 // 回路页、版本页
-await page.click(".tabs button >> nth=1");
+await page.click(".tab-pane:not(.hidden) .views >> text=回路");
 await page.hover(".loops li >> nth=1");
 await page.waitForTimeout(300);
 await shot("layout-demo-hover-loop");
-await page.click(".tabs button >> nth=2");
+await page.click(".tab-pane:not(.hidden) .views >> text=版本");
 await page.click(".timeline li >> nth=2");
 await page.waitForTimeout(600);
 await shot("m5-demo-view-old-version");
 
 // 设置
-await page.goto(mapUrl("demo"));
-await page.waitForSelector(".graph canvas");
-await page.click("header button[title=设置]");
+await openMap("demo");
+await page.click(".topbar button[title=设置]");
 await page.waitForTimeout(200);
 await shot("m5-settings");
 
 // 小窗口：图例完整可见；折叠后
 await page.setViewportSize({ width: 900, height: 560 });
-await page.goto(mapUrl("11"));
-await page.waitForSelector(".graph canvas");
-await page.waitForTimeout(900);
+await openMap("11");
 await shot("m5-small-window-legend");
-const zoom = await page.evaluate(() => (window as unknown as { __cy: import("cytoscape").Core }).__cy.zoom());
+const zoom = await page.evaluate(() => (document.querySelector(".tab-pane:not(.hidden) .graph") as unknown as { __cy: import("cytoscape").Core }).__cy.zoom());
 console.log(`  小窗口：缩放 ${zoom.toFixed(2)}，变量名 ${(14 * zoom).toFixed(1)}px（应不小于 12px）`);
 const box = await page.locator(".legend").boundingBox();
 const vp = page.viewportSize()!;
