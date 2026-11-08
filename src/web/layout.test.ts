@@ -4,7 +4,7 @@ import { applyOps } from "../core/patch";
 import { Graph as GraphSchema, type Graph, type PatchOp } from "../core/schema";
 import { current, demoState, resolvePending } from "./demo";
 import fixtures from "./fixtures/real-graphs.json";
-import { MARKER_R, NODE_GAP, boxGap, computeLayout, nodeBoxes, placeLoopMarkers, segmentDistance, type Positions } from "./layout";
+import { MARKER_R, NODE_GAP, NODE_H, boxGap, computeLayout, freeSpotNear, nodeBoxes, nodeWidth, placeLoopMarkers, segmentDistance, type Positions } from "./layout";
 import { arrange, edgePath, routeEdges, routeInputs } from "./routing";
 
 /** 路由之后的问题，写成可读的文字 */
@@ -130,5 +130,21 @@ describe("增量布局：新增变量或关系后，已有节点不动", () => {
     const pair = live.flatMap((x) => live.map((y) => [x.id, y.id] as const)).find(([x, y]) => x !== y && !has(x, y))!;
     const after = applyOps(g, [{ index: 0, op: { op: "add_edge", from: pair[0], to: pair[1], polarity: "?", rationale: "" } }], "ai");
     expect(computeLayout(after, before)).toEqual(before);
+  });
+});
+
+describe("双击新增变量的位置", () => {
+  const boxes = new Map([
+    ["n1", { x: 0, y: 0, w: nodeWidth("房价"), h: NODE_H }],
+    ["n2", { x: 300, y: 0, w: nodeWidth("购房需求"), h: NODE_H }],
+  ]);
+  it("空白处：就用双击的位置", () => {
+    expect(freeSpotNear({ x: 0, y: 200 }, nodeWidth("投资性购房"), boxes)).toEqual({ x: 0, y: 200 });
+  });
+  it("压在已有变量上：就近找空位，与已有变量至少隔开 NODE_GAP / 2", () => {
+    const w = nodeWidth("投资性购房");
+    const p = freeSpotNear({ x: 40, y: 2 }, w, boxes);
+    for (const b of boxes.values()) expect(boxGap({ ...p, w, h: NODE_H }, b)).toBeGreaterThanOrEqual(NODE_GAP / 2);
+    expect(Math.hypot(p.x - 40, p.y - 2)).toBeLessThan(200);
   });
 });

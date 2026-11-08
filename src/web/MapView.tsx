@@ -9,6 +9,7 @@ import type { MapState } from "../server/api";
 import { api, streamTurn } from "./client";
 import { ChatInput, ChatLog, type Busy } from "./Chat";
 import { GraphView, type Positions, type Selection } from "./GraphView";
+import { freeSpotNear, nodeBoxes, nodeWidth } from "./layout";
 import { LoopPanel, PatchPanel, SelectionPanel } from "./Panels";
 import { Notes, Timeline } from "./Timeline";
 
@@ -261,7 +262,9 @@ export function MapView(props: { name: string; config: WorkspaceConfig; onBack: 
                   if (e.key === "Enter" && newNode.label.trim()) {
                     const n = newNode;
                     setNewNode(null);
-                    void edit([{ op: "add_node", ref: "$new", label: n.label.trim() }], { $new: n.model });
+                    // 双击的位置离已有变量太近时，就近找空位（不压住已有变量）
+                    const spot = freeSpotNear(n.model, nodeWidth(n.label.trim()), nodeBoxes(graph, positions));
+                    void edit([{ op: "add_node", ref: "$new", label: n.label.trim() }], { $new: spot });
                   }
                 }}
                 onBlur={() => setNewNode(null)}

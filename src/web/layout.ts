@@ -53,6 +53,23 @@ export function boxGap(a: Box, b: Box): number {
   return Math.max(dx, dy);
 }
 
+/**
+ * 用户双击的位置：离已有变量太近（间隙小于 gap）时，就近向外找一个空位，避免新变量压在已有变量上。
+ * 已有变量不动。
+ */
+export function freeSpotNear(p: { x: number; y: number }, w: number, boxes: Map<string, Box>, gap = NODE_GAP / 2): { x: number; y: number } {
+  const fits = (c: { x: number; y: number }) => [...boxes.values()].every((b) => boxGap({ x: c.x, y: c.y, w, h: NODE_H }, b) >= gap);
+  if (fits(p)) return p;
+  for (let r = 20; r <= 800; r += 20) {
+    for (let k = 0; k < 24; k++) {
+      const a = (k / 24) * Math.PI * 2;
+      const c = { x: Math.round(p.x + Math.cos(a) * r), y: Math.round(p.y + Math.sin(a) * r * 0.6) };
+      if (fits(c)) return c;
+    }
+  }
+  return p;
+}
+
 /** 固定种子的伪随机数（mulberry32） */
 function seeded(seed: number) {
   let a = seed >>> 0;
