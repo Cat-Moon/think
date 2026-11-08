@@ -1,12 +1,13 @@
 // 图视图（设计文档第 9.2 节）：Cytoscape 渲染变量、关系、代码检测出的回路和补丁预览。
+// 位置由 layout.ts 计算（与容器尺寸无关）；容器有了真实尺寸之后才缩放到合适大小。
 import cytoscape, { type Core, type ElementDefinition, type StylesheetJson } from "cytoscape";
 import { useEffect, useRef } from "react";
 import type { Loop } from "../core/loops";
 import type { Preview } from "../core/preview";
 import type { Graph } from "../core/schema";
+import { MARKER_R, NODE_H, computeLayout, markerEdges, nodeBoxes, nodeWidth, placeLoopMarkers, visibleLoopIds, type Positions } from "./layout";
 
-export type Positions = Record<string, { x: number; y: number }>;
-
+export type { Positions };
 export type Selection = { kind: "node" | "edge"; id: string } | null;
 
 export interface GraphViewProps {
@@ -23,18 +24,20 @@ export interface GraphViewProps {
   selection: Selection;
   onSelect: (s: Selection) => void;
   highlightLoop: string | null;
+  /** 鼠标停在回路列表某一项上 */
+  hoverLoop: string | null;
   onLoopClick: (id: string | null) => void;
   showRejected: boolean;
 }
 
 const POL = { "+": "+", "-": "−", "?": "?" } as const;
-const nodeWidth = (label: string) => Math.max(64, [...label].length * 15 + 28);
+const MAX_FIT_ZOOM = 1.6;
 
 export const STYLE: StylesheetJson = [
   {
     selector: "node.var",
     style: {
-      shape: "round-rectangle",
+      shape: "roundrectangle",
       "background-color": "#ffffff",
       "border-width": 1.5,
       "border-color": "#4a5568",
@@ -44,21 +47,22 @@ export const STYLE: StylesheetJson = [
       "font-size": 14,
       color: "#1a202c",
       width: "data(w)",
-      height: 34,
+      height: NODE_H,
     },
   },
   {
     selector: "edge",
     style: {
       "curve-style": "bezier",
-      "control-point-step-size": 48,
+      // 互逆或平行的边错开弯曲
+      "control-point-step-size": 70,
       width: 2,
       "line-color": "#718096",
       "target-arrow-color": "#718096",
       "target-arrow-shape": "triangle",
       "arrow-scale": 1.2,
       label: "data(label)",
-      "font-size": 15,
+      "font-size": 16,
       "font-weight": "bold",
       "text-background-color": "#ffffff",
       "text-background-opacity": 1,
@@ -85,8 +89,8 @@ export const STYLE: StylesheetJson = [
     selector: "node.loop",
     style: {
       shape: "ellipse",
-      width: 30,
-      height: 30,
+      width: MARKER_R * 2,
+      height: MARKER_R * 2,
       label: "data(label)",
       "font-size": 12,
       "font-weight": "bold",
@@ -107,16 +111,12 @@ export const STYLE: StylesheetJson = [
   { selector: "node.hl", style: { "border-width": 3 } },
 ];
 
-/** 回路标记放在回路上各节点位置的中心 */
-function centroid(cy: Core, nodeIds: string[]): { x: number; y: number } {
-  const ps = nodeIds.map((id) => cy.getElementById(id)).filter((n) => n.nonempty()).map((n) => n.position());
-  if (!ps.length) return { x: 0, y: 0 };
-  return { x: ps.reduce((a, p) => a + p.x, 0) / ps.length, y: ps.reduce((a, p) => a + p.y, 0) / ps.length };
-}
+/** 图上实际显示的图：有预览时是"假装应用"之后的图 */
+const viewGraph = (p: GraphViewProps) => p.preview?.after ?? p.graph;
 
 export function buildElements(props: GraphViewProps): ElementDefinition[] {
   const { graph, preview, accepted, showRejected } = props;
-  const base = preview?.after ?? graph;
+  const base = viewGraph(props);
   const ghostOf = new Map<string, { op: number; effect: string }>();
   for (const o of preview?.ops ?? []) for (const id of o.elements) ghostOf.set(id, { op: o.index, effect: o.effect });
 
@@ -151,7 +151,9 @@ export function buildElements(props: GraphViewProps): ElementDefinition[] {
     const label = `${POL[e.polarity]}${e.delay ? " ‖" : ""}${e.contested ? " ⚑" : ""}`;
     out.push({ group: "edges", data: { id: e.id, source: e.from, target: e.to, label }, classes: cls.join(" ") });
   }
+  const shown = new Set(visibleLoopIds(props.loops.map((l) => l.id), props.highlightLoop, props.hoverLoop));
   for (const l of props.loops) {
+    if (!shown.has(l.id)) continue;
     const cls = ["loop", l.polarity === "?" ? "U" : l.polarity];
     if (l.uncertain) cls.push("dashed");
     out.push({ group: "nodes", data: { id: `loop:${l.id}`, label: l.id, loop: l.id }, classes: cls.join(" "), grabbable: false, selectable: false });
@@ -164,10 +166,27 @@ export function GraphView(props: GraphViewProps) {
   const cyRef = useRef<Core | null>(null);
   const propsRef = useRef(props);
   propsRef.current = props;
+  /** 需要在容器有尺寸后缩放到合适大小（首次打开、重新布局） */
+  const needsFit = useRef(true);
+
+  const fitIfReady = () => {
+    const cy = cyRef.current;
+    const el = container.current;
+    if (!cy || !el || !needsFit.current || el.clientWidth === 0 || el.clientHeight === 0) return;
+    const vars = cy.nodes("node.var");
+    if (vars.empty()) return;
+    cy.resize();
+    cy.fit(vars, 50);
+    if (cy.zoom() > MAX_FIT_ZOOM) {
+      cy.zoom(MAX_FIT_ZOOM);
+      cy.center(vars);
+    }
+    needsFit.current = false;
+  };
 
   // 创建一次
   useEffect(() => {
-    const cy = cytoscape({ container: container.current, style: STYLE, minZoom: 0.3, maxZoom: 2.5, wheelSensitivity: 0.3 });
+    const cy = cytoscape({ container: container.current, style: STYLE, minZoom: 0.3, maxZoom: 2.5 });
     cyRef.current = cy;
     cy.on("tap", "node.var", (e) => propsRef.current.onSelect({ kind: "node", id: e.target.id() }));
     cy.on("tap", "edge", (e) => propsRef.current.onSelect({ kind: "edge", id: e.target.id() }));
@@ -181,91 +200,86 @@ export function GraphView(props: GraphViewProps) {
         propsRef.current.onLoopClick(null);
       }
     });
+    cy.on("drag", "node.var", () => placeMarkers(cy, propsRef.current));
     cy.on("dragfree", "node.var", () => {
       const positions: Positions = { ...propsRef.current.positions };
       cy.nodes("node.var").forEach((n) => {
-        positions[n.id()] = { ...n.position() };
+        positions[n.id()] = { x: Math.round(n.position().x), y: Math.round(n.position().y) };
       });
       propsRef.current.onPositions(positions);
     });
-    cy.on("drag", "node.var", () => placeLoops(cy));
-    return () => cy.destroy();
+    // 容器尺寸确定或变化时：更新 Cytoscape 的尺寸；首次有尺寸时缩放到合适大小
+    const ro = new ResizeObserver(() => {
+      cy.resize();
+      fitIfReady();
+    });
+    if (container.current) ro.observe(container.current);
+    return () => {
+      ro.disconnect();
+      cy.destroy();
+    };
   }, []);
 
-  // 内容变化时重建元素，保留缩放和平移
+  // 内容变化：重建元素，计算缺少的位置（已有位置不动），保留缩放和平移
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
-    const { positions } = props;
+    const g = viewGraph(props);
+    if (Object.keys(props.positions).length === 0) needsFit.current = true;
+    const pos = computeLayout(g, props.positions, props.showRejected);
     cy.batch(() => {
       cy.elements().remove();
       cy.add(buildElements(props));
-    });
-    cy.scratch("loops", Object.fromEntries(props.loops.map((l) => [l.id, l.nodes])));
-    const vars = cy.nodes("node.var");
-    const missing = vars.filter((n) => !positions[n.id()]);
-    vars.forEach((n) => {
-      const p = positions[n.id()];
-      if (p) n.position(p);
-    });
-    if (missing.length === vars.length && vars.length) {
-      // 第一次打开：整体自动布局，然后保存位置
-      cy.layout({ name: "cose", animate: false, randomize: true, nodeRepulsion: () => 12000, idealEdgeLength: () => 140, padding: 40 }).run();
-      placeLoops(cy);
-      applyHighlight(cy, props);
-      cy.fit(undefined, 40);
-      const saved: Positions = {};
-      vars.forEach((n) => {
-        saved[n.id()] = { ...n.position() };
+      cy.nodes("node.var").forEach((n) => {
+        const p = pos[n.id()];
+        if (p) n.position({ ...p });
       });
-      props.onPositions(saved);
-      return;
-    }
-    if (missing.length) {
-      // 新变量：放在已连接变量的中心附近，已有变量的位置不动
-      missing.forEach((n, i) => {
-        const placed = n.neighborhood("node.var").filter((m) => Boolean(positions[m.id()]));
-        const c = placed.length ? centroid(cy, placed.map((m) => m.id())) : centroid(cy, Object.keys(positions));
-        n.position({ x: c.x + 90 + i * 30, y: c.y + 70 + i * 30 });
-      });
-      if (!isPreviewing(props)) {
-        const saved: Positions = { ...positions };
-        missing.forEach((n) => {
-          saved[n.id()] = { ...n.position() };
-        });
-        props.onPositions(saved);
-      }
-    }
-    placeLoops(cy);
+    });
+    placeMarkers(cy, props);
     applyHighlight(cy, props);
+    fitIfReady();
+    if (Object.keys(pos).some((id) => !props.positions[id])) props.onPositions({ ...props.positions, ...pos });
   }, [props.graph, props.preview, props.accepted, props.showRejected, props.loops, props.positions]);
 
-  // 选中、高亮回路、补丁项悬停
+  // 选中、高亮或悬停回路、补丁项悬停
   useEffect(() => {
     const cy = cyRef.current;
-    if (cy) applyHighlight(cy, props);
-  }, [props.selection, props.highlightLoop, props.hoverOp]);
+    if (!cy) return;
+    const shown = new Set(visibleLoopIds(props.loops.map((l) => l.id), props.highlightLoop, props.hoverLoop));
+    const present = new Set(cy.nodes("node.loop").map((n) => n.data("loop") as string));
+    if ([...shown].some((id) => !present.has(id)) || [...present].some((id) => !shown.has(id))) {
+      cy.nodes("node.loop").remove();
+      cy.add(buildElements(props).filter((e) => String(e.classes).includes("loop")));
+    }
+    placeMarkers(cy, props);
+    applyHighlight(cy, props);
+  }, [props.selection, props.highlightLoop, props.hoverLoop, props.hoverOp]);
 
   return <div ref={container} className="graph" />;
 }
 
-/** 预览中的幽灵变量位置只是临时的，不保存 */
-const isPreviewing = (p: GraphViewProps) => p.preview !== null;
-
-function placeLoops(cy: Core) {
-  cy.nodes("node.loop").forEach((n) => {
-    const id = n.data("loop") as string;
-    const loopNodes = (cy.scratch("loops") as Record<string, string[]> | undefined)?.[id];
-    if (loopNodes) n.position(centroid(cy, loopNodes));
+/** 回路标记放在回路附近、避开所有节点和其他标记 */
+function placeMarkers(cy: Core, props: GraphViewProps) {
+  const markers = cy.nodes("node.loop");
+  if (markers.empty()) return;
+  const current: Positions = {};
+  cy.nodes("node.var").forEach((n) => {
+    current[n.id()] = n.position();
+  });
+  const boxes = nodeBoxes(viewGraph(props), current, props.showRejected);
+  const ids = new Set(markers.map((m) => m.data("loop") as string));
+  const placed = placeLoopMarkers(props.loops.filter((l) => ids.has(l.id)), boxes, markerEdges(viewGraph(props), props.showRejected));
+  markers.forEach((m) => {
+    const p = placed[m.data("loop") as string];
+    if (p) m.position(p);
   });
 }
 
 function applyHighlight(cy: Core, props: GraphViewProps) {
-  placeLoops(cy);
   cy.batch(() => {
     cy.elements().removeClass("dim hl hover-op").unselect();
     if (props.selection) cy.getElementById(props.selection.id).select();
-    const loop = props.loops.find((l) => l.id === props.highlightLoop);
+    const loop = props.loops.find((l) => l.id === (props.highlightLoop ?? props.hoverLoop));
     if (loop) {
       const keep = cy.collection();
       for (const id of [...loop.nodes, ...loop.edges, `loop:${loop.id}`]) keep.merge(cy.getElementById(id));

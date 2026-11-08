@@ -19,6 +19,7 @@ const props = (over: Partial<GraphViewProps> = {}): GraphViewProps => {
     selection: null,
     onSelect: () => undefined,
     highlightLoop: null,
+    hoverLoop: null,
     onLoopClick: () => undefined,
     showRejected: true,
     ...over,
@@ -50,7 +51,10 @@ describe("图视图（无界面模式）", () => {
     expect(cls("e8")).toContain("contested");
     expect(data("e1")?.label).toBe("+ ‖");
     expect(data("e8")?.label).toBe("− ⚑");
-    expect(els.filter((e) => String(e.classes).includes("loop")).map((e) => e.data.label).sort()).toEqual(["?1", "B1", "R1", "R2"]);
+    // 回路多于 2 个：默认不显示标记，只显示选中或悬停的
+    expect(els.filter((e) => String(e.classes).includes("loop"))).toEqual([]);
+    const hl = buildElements(props({ highlightLoop: "R1", hoverLoop: "B1" }));
+    expect(hl.filter((e) => String(e.classes).includes("loop")).map((e) => e.data.label).sort()).toEqual(["B1", "R1"]);
   });
 
   it("没有预览时不画幽灵；默认隐藏已拒绝的内容", () => {

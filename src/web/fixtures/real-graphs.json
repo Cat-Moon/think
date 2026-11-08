@@ -1,0 +1,2285 @@
+[
+ {
+  "name": "contested-1（最终）",
+  "graph": {
+   "schema_version": 1,
+   "version": "v002",
+   "frame": {
+    "topic": "为什么选举中的政治两极分化越来越严重",
+    "phenomenon": "选举中政治两极分化持续加深",
+    "perspective": "社会系统（多类型原因并列）",
+    "time_horizon": "数十年的长期趋势",
+    "context": "未指定（不默认任何国家）"
+   },
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "政治两极分化程度",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n2",
+     "label": "媒体信息茧房",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n3",
+     "label": "经济不平等",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n4",
+     "label": "精英极化程度",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n5",
+     "label": "基本盘动员程度",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "from": "n2",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "信息茧房使人们对对立观点的接触减少，强化既有立场，加深与另一方的认知距离。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e2",
+     "from": "n3",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "一些研究认为经济不平等加剧社会怨恨、推动政治对立；另一些研究认为文化认同和身份因素才是主因，经济影响被高估。",
+     "contested": true,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e3",
+     "from": "n4",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "精英采取极端立场后，会向选民传递对立信号，激化选民间的阵营感。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e4",
+     "from": "n5",
+     "to": "n4",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "当胜选依赖基本盘出翔率，政治人物会向更极端立场靠拢以点燃支持者热情；温和立场反而可能让核心支持者失去投票动力。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e5",
+     "from": "n5",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "动员策略会强化「我们 vs 他们」的对立框架，直接加深选民对对方阵营的负面认知，而不仅仅通过精英行为间接传导。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    }
+   ]
+  }
+ },
+ {
+  "name": "contested-1（全接受）",
+  "graph": {
+   "schema_version": 1,
+   "version": "v003",
+   "frame": {
+    "topic": "为什么选举中的政治两极分化越来越严重",
+    "phenomenon": "选举中政治两极分化持续加深",
+    "perspective": "社会系统（多类型原因并列）",
+    "time_horizon": "数十年的长期趋势",
+    "context": "未指定（不默认任何国家）"
+   },
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "政治两极分化程度",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n2",
+     "label": "媒体信息茧房",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n3",
+     "label": "经济不平等",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n4",
+     "label": "精英极化程度",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n5",
+     "label": "身份认同政治",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n6",
+     "label": "基本盘动员程度",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "from": "n2",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "信息茧房使人们对对立观点的接触减少，强化既有立场，加深与另一方的认知距离。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e2",
+     "from": "n3",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "一些研究认为经济不平等加剧社会怨恨、推动政治对立；另一些研究认为文化认同和身份因素才是主因，经济影响被高估。",
+     "contested": true,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e3",
+     "from": "n4",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "精英采取极端立场后，会向选民传递对立信号，激化选民间的阵营感。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e4",
+     "from": "n1",
+     "to": "n4",
+     "polarity": "+",
+     "delay": true,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "选民两极化后，更倾向支持立场鲜明的候选人，激励政治精英采取更极端的位置以争取选票。这个影响通常需要经过数个选举周期才显现。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e5",
+     "from": "n5",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "当政治归属被视为个人身份的核心，不同立场的人会把对方看作威胁而非对话对象，加深阵营对立。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e6",
+     "from": "n2",
+     "to": "n5",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "信息茧房持续强化群体内部的共同叙事与「我们vs他们」框架，使政治身份认同随时间变得更加突出和排他。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e7",
+     "from": "n6",
+     "to": "n4",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "当胜选依赖基本盘出翔率，政治人物会向更极端立场靠拢以点燃支持者热情；温和立场反而可能让核心支持者失去投票动力。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e8",
+     "from": "n6",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "动员策略会强化「我们 vs 他们」的对立框架，直接加深选民对对方阵营的负面认知，而不仅仅通过精英行为间接传导。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    }
+   ]
+  }
+ },
+ {
+  "name": "contested-3（最终）",
+  "graph": {
+   "schema_version": 1,
+   "version": "v002",
+   "frame": {
+    "topic": "为什么选举中的政治两极分化越来越严重",
+    "phenomenon": "选举中政治两极分化程度持续加剧",
+    "perspective": "社会与政治系统",
+    "time_horizon": "过去数十年的长期趋势",
+    "context": "未指定（不默认任何国家或地区）"
+   },
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "政治极化程度",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n2",
+     "label": "信息茧房",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n3",
+     "label": "身份认同对立",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n4",
+     "label": "精英极化",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n5",
+     "label": "经济不平等",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "from": "n2",
+     "to": "n3",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "信息茧房使人长期只接触强化自身立场的内容，内外群体边界感随之加深。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e2",
+     "from": "n3",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "身份认同对立越强，选民越倾向于按阵营投票，整体极化程度随之上升。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e3",
+     "from": "n5",
+     "to": "n3",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "一种观点认为经济利益分化会激化群体对立；另一种观点认为文化与身份因素独立于经济，两者之间的关系仍有争议。",
+     "contested": true,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e4",
+     "from": "n4",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "精英立场走向极端会拉大党派差距，给选民提供更分化的信号和选项。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e5",
+     "from": "n3",
+     "to": "n4",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "身份对立越深，核心选民对本阵营立场的期待越强，精英若向中间靠拢反而面临党内压力，动员逻辑驱使其立场趋向极端。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e6",
+     "from": "n1",
+     "to": "n2",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "极化程度越高，人们越倾向于主动回避对立阵营的信息源，选择性接触强化了原有立场的内容，信息茧房因此加深。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    }
+   ]
+  }
+ },
+ {
+  "name": "contested-3（全接受）",
+  "graph": {
+   "schema_version": 1,
+   "version": "v003",
+   "frame": {
+    "topic": "为什么选举中的政治两极分化越来越严重",
+    "phenomenon": "选举中政治两极分化程度持续加剧",
+    "perspective": "社会与政治系统",
+    "time_horizon": "过去数十年的长期趋势",
+    "context": "未指定（不默认任何国家或地区）"
+   },
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "政治极化程度",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n2",
+     "label": "信息茧房",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n3",
+     "label": "身份认同对立",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n4",
+     "label": "精英极化",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n5",
+     "label": "经济不平等",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n6",
+     "label": "算法推荐",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "from": "n2",
+     "to": "n3",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "信息茧房使人长期只接触强化自身立场的内容，内外群体边界感随之加深。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e2",
+     "from": "n3",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "身份认同对立越强，选民越倾向于按阵营投票，整体极化程度随之上升。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e3",
+     "from": "n5",
+     "to": "n3",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "一种观点认为经济利益分化会激化群体对立；另一种观点认为文化与身份因素独立于经济，两者之间的关系仍有争议。",
+     "contested": true,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e4",
+     "from": "n4",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "精英立场走向极端会拉大党派差距，给选民提供更分化的信号和选项。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e5",
+     "from": "n1",
+     "to": "n4",
+     "polarity": "+",
+     "delay": true,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "选民极化后，更愿意支持立场鲜明的强硬候选人，对温和派的容忍度下降，逐渐推动精英走向极端。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e6",
+     "from": "n6",
+     "to": "n2",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "算法倾向于推送能引发强烈情绪和立场鲜明的内容，使用户接收到的信息趋于同质化，信息茧房因此加深。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e7",
+     "from": "n3",
+     "to": "n4",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "身份对立越深，核心选民对本阵营立场的期待越强，精英若向中间靠拢反而面临党内压力，动员逻辑驱使其立场趋向极端。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e8",
+     "from": "n1",
+     "to": "n2",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "极化程度越高，人们越倾向于主动回避对立阵营的信息源，选择性接触强化了原有立场的内容，信息茧房因此加深。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    }
+   ]
+  }
+ },
+ {
+  "name": "social-1（最终）",
+  "graph": {
+   "schema_version": 1,
+   "version": "v002",
+   "frame": {
+    "topic": "社交媒体与注意力",
+    "phenomenon": "长期使用社交媒体后，个人越来越难长时间专注",
+    "perspective": "个人用户（自我观察）",
+    "time_horizon": "数年",
+    "context": "未指定地区"
+   },
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "社交媒体使用时长",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n2",
+     "label": "短内容曝光频率",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n3",
+     "label": "即时奖励期待",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n4",
+     "label": "深度专注能力",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n5",
+     "label": "注意力切换频率",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "from": "n1",
+     "to": "n2",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "使用时长越长，接触到的短视频、推文等碎片内容就越多。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e2",
+     "from": "n2",
+     "to": "n3",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "高频短内容会反复触发小幅奖励感，让大脑逐渐习惯并期待这种即时反馈节奏。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e3",
+     "from": "n3",
+     "to": "n4",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "对即时奖励的期待越高，越难忍受需要等待才有回报的深度任务，专注能力因此受到影响。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e4",
+     "from": "n2",
+     "to": "n5",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "短内容曝光越频繁，大脑在单个内容上停留的时间越短，注意力切换的节奏也随之加快。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e5",
+     "from": "n5",
+     "to": "n4",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "切换注意力的习惯越强，越难让注意力在同一件事上持续停留，深度专注因此受到影响。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    }
+   ]
+  }
+ },
+ {
+  "name": "social-1（全接受）",
+  "graph": {
+   "schema_version": 1,
+   "version": "v003",
+   "frame": {
+    "topic": "社交媒体与注意力",
+    "phenomenon": "长期使用社交媒体后，个人越来越难长时间专注",
+    "perspective": "个人用户（自我观察）",
+    "time_horizon": "数年",
+    "context": "未指定地区"
+   },
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "社交媒体使用时长",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n2",
+     "label": "短内容曝光频率",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n3",
+     "label": "即时奖励期待",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n4",
+     "label": "深度专注能力",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n5",
+     "label": "通知频率",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n6",
+     "label": "注意力切换频率",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "from": "n1",
+     "to": "n2",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "使用时长越长，接触到的短视频、推文等碎片内容就越多。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e2",
+     "from": "n2",
+     "to": "n3",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "高频短内容会反复触发小幅奖励感，让大脑逐渐习惯并期待这种即时反馈节奏。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e3",
+     "from": "n3",
+     "to": "n4",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "对即时奖励的期待越高，越难忍受需要等待才有回报的深度任务，专注能力因此受到影响。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e4",
+     "from": "n4",
+     "to": "n1",
+     "polarity": "-",
+     "delay": true,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "当深度专注越来越困难时，人容易转而拿起手机刷社交媒体，使用时长随之增加。这个效果可能需要一段时间才显现。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e5",
+     "from": "n1",
+     "to": "n5",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "使用时长越长，往往意味着关注了更多账号、开启了更多应用，通知也随之增多。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e6",
+     "from": "n5",
+     "to": "n4",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "通知会在专注过程中插入外部刺激，每一次打断都需要重新进入状态，累积后会削弱维持深度专注的能力。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e7",
+     "from": "n2",
+     "to": "n6",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "短内容曝光越频繁，大脑在单个内容上停留的时间越短，注意力切换的节奏也随之加快。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e8",
+     "from": "n6",
+     "to": "n4",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "切换注意力的习惯越强，越难让注意力在同一件事上持续停留，深度专注因此受到影响。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    }
+   ]
+  }
+ },
+ {
+  "name": "social-3（最终）",
+  "graph": {
+   "schema_version": 1,
+   "version": "v002",
+   "frame": {
+    "topic": "社交媒体与注意力",
+    "phenomenon": "个人用户长期使用社交媒体后，越来越难以长时间专注",
+    "perspective": "个人用户",
+    "time_horizon": "数年",
+    "context": "未指定地区"
+   },
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "社交媒体使用时长",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n2",
+     "label": "碎片化内容接触",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n3",
+     "label": "即时刺激期待",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n4",
+     "label": "注意力持续时长",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n5",
+     "label": "睡眠质量",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "from": "n1",
+     "to": "n2",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "使用时间越长，接触到的短促、高频内容总量越大。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e2",
+     "from": "n2",
+     "to": "n3",
+     "polarity": "+",
+     "delay": true,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "持续接触碎片化内容会逐渐让大脑习惯快速切换，形成对即时刺激的期待。这种神经适应需要数月到数年才会显现。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e3",
+     "from": "n3",
+     "to": "n4",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "当大脑期待随时出现新刺激时，面对进展缓慢的任务会更快感到不耐烦，难以持续专注。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e4",
+     "from": "n1",
+     "to": "n5",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "使用社交媒体（尤其在夜间）会推迟入睡时间，屏幕蓝光和内容刺激也会降低睡眠深度和连续性。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e5",
+     "from": "n5",
+     "to": "n4",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "睡眠质量越低，大脑在白天可调用的认知资源越少，能维持专注的时间也越短。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    }
+   ]
+  }
+ },
+ {
+  "name": "social-3（全接受）",
+  "graph": {
+   "schema_version": 1,
+   "version": "v003",
+   "frame": {
+    "topic": "社交媒体与注意力",
+    "phenomenon": "个人用户长期使用社交媒体后，越来越难以长时间专注",
+    "perspective": "个人用户",
+    "time_horizon": "数年",
+    "context": "未指定地区"
+   },
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "社交媒体使用时长",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n2",
+     "label": "碎片化内容接触",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n3",
+     "label": "即时刺激期待",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n4",
+     "label": "注意力持续时长",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n5",
+     "label": "深度专注练习",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n6",
+     "label": "睡眠质量",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "from": "n1",
+     "to": "n2",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "使用时间越长，接触到的短促、高频内容总量越大。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e2",
+     "from": "n2",
+     "to": "n3",
+     "polarity": "+",
+     "delay": true,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "持续接触碎片化内容会逐渐让大脑习惯快速切换，形成对即时刺激的期待。这种神经适应需要数月到数年才会显现。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e3",
+     "from": "n3",
+     "to": "n4",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "当大脑期待随时出现新刺激时，面对进展缓慢的任务会更快感到不耐烦，难以持续专注。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e4",
+     "from": "n3",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "对即时刺激的渴望越强，越容易拿起手机刷社交媒体来满足这种需求，从而增加使用时长。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e5",
+     "from": "n1",
+     "to": "n5",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "社交媒体占用的时间和精力，直接挤压了原本可用于深度专注练习的时间。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e6",
+     "from": "n5",
+     "to": "n4",
+     "polarity": "+",
+     "delay": true,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "持续练习才能维持甚至提升专注能力；练习减少，这项能力会随时间慢慢衰退。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e7",
+     "from": "n1",
+     "to": "n6",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "使用社交媒体（尤其在夜间）会推迟入睡时间，屏幕蓝光和内容刺激也会降低睡眠深度和连续性。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e8",
+     "from": "n6",
+     "to": "n4",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "睡眠质量越低，大脑在白天可调用的认知资源越少，能维持专注的时间也越短。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    }
+   ]
+  }
+ },
+ {
+  "name": "region-2（最终）",
+  "graph": {
+   "schema_version": 1,
+   "version": "v002",
+   "frame": {
+    "topic": "为什么日本的出生率持续下降",
+    "phenomenon": "日本出生率持续下降",
+    "perspective": "社会与经济",
+    "time_horizon": "过去三十年（约1990年代至今）",
+    "context": "日本"
+   },
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "出生率",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n2",
+     "label": "生育意愿",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n3",
+     "label": "育儿成本",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n4",
+     "label": "工作时间",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n5",
+     "label": "婚姻率",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n6",
+     "label": "育儿支援",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "from": "n2",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "生育意愿越强，实际发生生育行为的概率越高。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e2",
+     "from": "n3",
+     "to": "n2",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "养育孩子的经济压力越大，人们越倾向于推迟或放弃生育计划。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e3",
+     "from": "n4",
+     "to": "n2",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "长时间工作压缩了个人时间与精力，使组建家庭的意愿和机会减少。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e4",
+     "from": "n6",
+     "to": "n3",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "制度性育儿支援越充分，家庭在时间与金钱上需要自行负担的部分就越少，育儿成本随之降低。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e5",
+     "from": "n4",
+     "to": "n5",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "长时间工作压缩了社交与私人时间，减少了认识伴侣、发展关系的机会，使步入婚姻变得更困难。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    }
+   ]
+  }
+ },
+ {
+  "name": "region-2（全接受）",
+  "graph": {
+   "schema_version": 1,
+   "version": "v003",
+   "frame": {
+    "topic": "为什么日本的出生率持续下降",
+    "phenomenon": "日本出生率持续下降",
+    "perspective": "社会与经济",
+    "time_horizon": "过去三十年（约1990年代至今）",
+    "context": "日本"
+   },
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "出生率",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n2",
+     "label": "生育意愿",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n3",
+     "label": "育儿成本",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n4",
+     "label": "工作时间",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n5",
+     "label": "婚姻率",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n6",
+     "label": "经济不稳定性",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n7",
+     "label": "育儿支援",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "from": "n2",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "生育意愿越强，实际发生生育行为的概率越高。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e2",
+     "from": "n3",
+     "to": "n2",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "养育孩子的经济压力越大，人们越倾向于推迟或放弃生育计划。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e3",
+     "from": "n4",
+     "to": "n2",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "长时间工作压缩了个人时间与精力，使组建家庭的意愿和机会减少。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e4",
+     "from": "n5",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "在日本，绝大多数孩子出生在婚姻内，婚姻数量下降直接拉低出生率。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e5",
+     "from": "n6",
+     "to": "n3",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "收入不稳定时，同等金额的育儿支出会带来更大的财务压力，感知成本上升。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e6",
+     "from": "n6",
+     "to": "n2",
+     "polarity": "-",
+     "delay": true,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "就业和收入的不确定性让人更不愿承担生育带来的长期财务责任，直接压低生育意愿。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e7",
+     "from": "n7",
+     "to": "n3",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "制度性育儿支援越充分，家庭在时间与金钱上需要自行负担的部分就越少，育儿成本随之降低。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e8",
+     "from": "n4",
+     "to": "n5",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "长时间工作压缩了社交与私人时间，减少了认识伴侣、发展关系的机会，使步入婚姻变得更困难。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    }
+   ]
+  }
+ },
+ {
+  "name": "traffic-1（最终）",
+  "graph": {
+   "schema_version": 1,
+   "version": "v002",
+   "frame": {
+    "topic": "城市交通为什么越修路越堵",
+    "phenomenon": "新建或扩容道路后，交通拥堵程度在数年内回升，甚至超过修路前",
+    "perspective": "城市交通规划",
+    "time_horizon": "中期（数年）",
+    "context": "未指定"
+   },
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "道路容量",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n2",
+     "label": "行驶速度",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n3",
+     "label": "驾车出行量",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n4",
+     "label": "交通拥堵程度",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n5",
+     "label": "城市扩张程度",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "from": "n1",
+     "to": "n2",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "道路容量增加，同等车流量下路面更宽松，车速暂时提升。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e2",
+     "from": "n2",
+     "to": "n3",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "行驶速度越高，出行时间越短，更多人倾向于选择开车或增加出行次数。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e3",
+     "from": "n3",
+     "to": "n4",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "驾车出行量增加，路面车辆增多，拥堵随之加剧。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e4",
+     "from": "n1",
+     "to": "n5",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "道路容量增加使远郊土地更易达，降低了外围开发的门槛，刺激了住宅区和就业地向外蔓延。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e5",
+     "from": "n5",
+     "to": "n3",
+     "polarity": "+",
+     "delay": true,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "城市形态越分散，居民出行距离越长、目的地越难以步行或公共交通覆盖，驾车出行的依赖程度随之上升。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    }
+   ]
+  }
+ },
+ {
+  "name": "traffic-1（全接受）",
+  "graph": {
+   "schema_version": 1,
+   "version": "v003",
+   "frame": {
+    "topic": "城市交通为什么越修路越堵",
+    "phenomenon": "新建或扩容道路后，交通拥堵程度在数年内回升，甚至超过修路前",
+    "perspective": "城市交通规划",
+    "time_horizon": "中期（数年）",
+    "context": "未指定"
+   },
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "道路容量",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n2",
+     "label": "行驶速度",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n3",
+     "label": "驾车出行量",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n4",
+     "label": "交通拥堵程度",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n5",
+     "label": "城市扩张程度",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "from": "n1",
+     "to": "n2",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "道路容量增加，同等车流量下路面更宽松，车速暂时提升。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e2",
+     "from": "n2",
+     "to": "n3",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "行驶速度越高，出行时间越短，更多人倾向于选择开车或增加出行次数。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e3",
+     "from": "n3",
+     "to": "n4",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "驾车出行量增加，路面车辆增多，拥堵随之加剧。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e4",
+     "from": "n4",
+     "to": "n2",
+     "polarity": "-",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "拥堵越严重，车辆行进越缓慢，行驶速度下降。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e5",
+     "from": "n4",
+     "to": "n1",
+     "polarity": "+",
+     "delay": true,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "拥堵程度上升时，公众不满和政策压力会推动新一轮道路扩建计划，道路容量随之提高。这个过程通常需要几年时间。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e6",
+     "from": "n1",
+     "to": "n5",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "道路容量增加使远郊土地更易达，降低了外围开发的门槛，刺激了住宅区和就业地向外蔓延。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e7",
+     "from": "n5",
+     "to": "n3",
+     "polarity": "+",
+     "delay": true,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "城市形态越分散，居民出行距离越长、目的地越难以步行或公共交通覆盖，驾车出行的依赖程度随之上升。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    }
+   ]
+  }
+ },
+ {
+  "name": "procrastination-1（最终）",
+  "graph": {
+   "schema_version": 1,
+   "version": "v003",
+   "frame": {
+    "topic": "为什么我总是拖延",
+    "phenomenon": "拖延行为持续出现，难以开始或完成任务",
+    "perspective": "个人行为与情绪",
+    "time_horizon": "日常短期到中期（数天到数周）",
+    "context": "未指定"
+   },
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "任务焦虑",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n2",
+     "label": "拖延行为",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n3",
+     "label": "任务积压",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n4",
+     "label": "即时回避感",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n5",
+     "label": "自责感",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "from": "n1",
+     "to": "n2",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "对任务的焦虑让人想逃离，倾向于推迟开始。焦虑越高，回避动机越强。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e2",
+     "from": "n2",
+     "to": "n3",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "持续推迟导致未完成的任务不断堆积。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e3",
+     "from": "n3",
+     "to": "n1",
+     "polarity": "+",
+     "delay": true,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "积压越多，意识到落后程度后压力感随之上升。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e4",
+     "from": "n1",
+     "to": "n4",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "任务焦虑会激发想要逃离不舒适感的冲动，直接产生即时回避的欲望。焦虑越高，这股回避冲动往往越强烈。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e5",
+     "from": "n2",
+     "to": "n5",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "拖延行为发生后，人往往意识到自己又没有完成任务，随即产生内疚和自我批评的情绪。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e6",
+     "from": "n5",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "自责感会让任务显得更沉重（\"我连这个都做不好\"），进而加剧面对任务时的焦虑程度。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    }
+   ]
+  }
+ },
+ {
+  "name": "procrastination-1（全接受）",
+  "graph": {
+   "schema_version": 1,
+   "version": "v003",
+   "frame": {
+    "topic": "为什么我总是拖延",
+    "phenomenon": "拖延行为持续出现，难以开始或完成任务",
+    "perspective": "个人行为与情绪",
+    "time_horizon": "日常短期到中期（数天到数周）",
+    "context": "未指定"
+   },
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "任务焦虑",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n2",
+     "label": "拖延行为",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n3",
+     "label": "任务积压",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n4",
+     "label": "即时回避感",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n5",
+     "label": "自责感",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "from": "n1",
+     "to": "n2",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "对任务的焦虑让人想逃离，倾向于推迟开始。焦虑越高，回避动机越强。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e2",
+     "from": "n2",
+     "to": "n3",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "持续推迟导致未完成的任务不断堆积。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e3",
+     "from": "n3",
+     "to": "n1",
+     "polarity": "+",
+     "delay": true,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "积压越多，意识到落后程度后压力感随之上升。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e4",
+     "from": "n2",
+     "to": "n4",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "回避任务在当下消除了压迫感，带来短暂的轻松，这种即时回报强化了回避行为。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e5",
+     "from": "n1",
+     "to": "n4",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "任务焦虑会激发想要逃离不舒适感的冲动，直接产生即时回避的欲望。焦虑越高，这股回避冲动往往越强烈。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e6",
+     "from": "n4",
+     "to": "n2",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "即时回避感一旦出现，推迟任务成为缓解这种冲动最快速的出口，从而推动拖延行为发生。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e7",
+     "from": "n2",
+     "to": "n5",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "拖延行为发生后，人往往意识到自己又没有完成任务，随即产生内疚和自我批评的情绪。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e8",
+     "from": "n5",
+     "to": "n1",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "自责感会让任务显得更沉重（\"我连这个都做不好\"），进而加剧面对任务时的焦虑程度。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    }
+   ]
+  }
+ },
+ {
+  "name": "clear-1（最终）",
+  "graph": {
+   "schema_version": 1,
+   "version": "v002",
+   "frame": {
+    "topic": "为什么大城市的房价这些年一直在涨",
+    "phenomenon": "大城市房价持续上涨",
+    "perspective": "供需机制",
+    "time_horizon": "过去10至20年",
+    "context": "未指定国家；聚焦于人口持续流入的大城市"
+   },
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "人口流入",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n2",
+     "label": "住房需求",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n3",
+     "label": "房价",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n4",
+     "label": "土地供应",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n5",
+     "label": "住房供给",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n6",
+     "label": "收入水平",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "from": "n1",
+     "to": "n2",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "流入人口增加，需要住处的人增多，住房需求随之上升。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e2",
+     "from": "n2",
+     "to": "n3",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "在供给相对固定的情况下，需求增加会抬高房价。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e3",
+     "from": "n4",
+     "to": "n5",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "可供开发的土地越多，住宅建设的上限越高；土地受限则直接压缩供给。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e4",
+     "from": "n5",
+     "to": "n3",
+     "polarity": "-",
+     "delay": true,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "住房供给增加，可以缓解供需缺口，抑制价格上涨。",
+     "contested": false,
+     "confidence": null,
+     "note": "从土地开发到住宅建成入市通常需要数年，新增供给对价格的抑制效果存在明显的时间滞后。"
+    },
+    {
+     "id": "e5",
+     "from": "n6",
+     "to": "n2",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "收入越高，能负担更贵房子的人越多，市场上的有效需求随之扩大。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    }
+   ]
+  }
+ },
+ {
+  "name": "clear-1（全接受）",
+  "graph": {
+   "schema_version": 1,
+   "version": "v003",
+   "frame": {
+    "topic": "为什么大城市的房价这些年一直在涨",
+    "phenomenon": "大城市房价持续上涨",
+    "perspective": "供需机制",
+    "time_horizon": "过去10至20年",
+    "context": "未指定国家；聚焦于人口持续流入的大城市"
+   },
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "人口流入",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n2",
+     "label": "住房需求",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n3",
+     "label": "房价",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n4",
+     "label": "土地供应",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n5",
+     "label": "住房供给",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n6",
+     "label": "投资性需求",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    },
+    {
+     "id": "n7",
+     "label": "收入水平",
+     "status": "accepted",
+     "origin": "ai",
+     "note": ""
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "from": "n1",
+     "to": "n2",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "流入人口增加，需要住处的人增多，住房需求随之上升。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e2",
+     "from": "n2",
+     "to": "n3",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "在供给相对固定的情况下，需求增加会抬高房价。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e3",
+     "from": "n4",
+     "to": "n5",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "可供开发的土地越多，住宅建设的上限越高；土地受限则直接压缩供给。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e4",
+     "from": "n5",
+     "to": "n3",
+     "polarity": "-",
+     "delay": true,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "住房供给增加，可以缓解供需缺口，抑制价格上涨。",
+     "contested": false,
+     "confidence": null,
+     "note": "从土地开发到住宅建成入市通常需要数年，新增供给对价格的抑制效果存在明显的时间滞后。"
+    },
+    {
+     "id": "e5",
+     "from": "n3",
+     "to": "n5",
+     "polarity": "+",
+     "delay": true,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "房价上涨使开发利润增加，刺激开发商加大建设；但从立项到交房通常需要数年，存在明显滞后。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e6",
+     "from": "n6",
+     "to": "n3",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "投资性买家增多，市场上争抢同一批房源的人变多，直接拉高成交价格。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e7",
+     "from": "n3",
+     "to": "n6",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "房价上涨使房产的资产吸引力增强，更多人倾向于提前入市或增持，投资性需求随之上升。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    },
+    {
+     "id": "e8",
+     "from": "n7",
+     "to": "n2",
+     "polarity": "+",
+     "delay": false,
+     "status": "accepted",
+     "origin": "ai",
+     "rationale": "收入越高，能负担更贵房子的人越多，市场上的有效需求随之扩大。",
+     "contested": false,
+     "confidence": null,
+     "note": ""
+    }
+   ]
+  }
+ }
+]

@@ -174,7 +174,7 @@ export function PatchPanel(props: {
 
 // ---------- 回路 ----------
 
-export function LoopPanel(props: { graph: Graph; loops: Loop[]; truncated: boolean; highlight: string | null; onClick: (id: string | null) => void }) {
+export function LoopPanel(props: { graph: Graph; loops: Loop[]; truncated: boolean; highlight: string | null; onClick: (id: string | null) => void; onHover: (id: string | null) => void }) {
   const label = labeler(props.graph);
   return (
     <div className="card">
@@ -182,7 +182,7 @@ export function LoopPanel(props: { graph: Graph; loops: Loop[]; truncated: boole
       {props.loops.length === 0 && <p className="hint">还没有回路。</p>}
       <ul className="loops">
         {props.loops.map((l) => (
-          <li key={l.id} className={props.highlight === l.id ? "on" : ""} onClick={() => props.onClick(props.highlight === l.id ? null : l.id)}>
+          <li key={l.id} className={props.highlight === l.id ? "on" : ""} onClick={() => props.onClick(props.highlight === l.id ? null : l.id)} onMouseEnter={() => props.onHover(l.id)} onMouseLeave={() => props.onHover(null)}>
             <span className={`loop-badge loop-${l.polarity === "?" ? "U" : l.polarity}`}>{l.id}</span>
             <span>
               {[...l.nodes, l.nodes[0]!].map(label).join(" → ")}
@@ -192,7 +192,7 @@ export function LoopPanel(props: { graph: Graph; loops: Loop[]; truncated: boole
         ))}
       </ul>
       {props.truncated && <p className="warn">回路太多，只显示了前 200 个。</p>}
-      <p className="hint">R：增强，B：平衡，?：含极性未知的关系。由代码根据极性计算。</p>
+      <p className="hint">R：增强，B：平衡，?：含极性未知的关系。由代码根据极性计算。回路较多时，图上只显示选中或鼠标所指回路的标记。</p>
     </div>
   );
 }
