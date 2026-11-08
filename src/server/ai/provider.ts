@@ -63,7 +63,7 @@ export function addUsage(a: Usage, b: Usage): Usage {
 
 export const ERROR_TEXT: Record<LLMErrorKind, string> = {
   cancelled: "已取消",
-  timeout: "AI 响应超时",
+  timeout: "AI 超过时间上限仍未回复，已停止。你的输入已保存，可以重试",
   auth: "Claude Code 未登录或登录已失效，请在终端运行 claude 并登录",
   rate_limit: "订阅额度已用完或请求过于频繁，请稍后再试",
   no_output: "AI 没有给出结构化的回复",

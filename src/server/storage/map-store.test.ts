@@ -65,7 +65,7 @@ describe("测试隔离", () => {
 describe("工作区", () => {
   it("openWorkspace 创建 workspace.json 和 maps/", async () => {
     const root = tmpRoot();
-    expect(await openWorkspace(root)).toEqual({ schema_version: 1, default_model: "sonnet", privacy_notice_seen: false });
+    expect(await openWorkspace(root)).toEqual({ schema_version: 1, default_model: "sonnet", effort_short: "low", effort_long: null, privacy_notice_seen: false });
     expect(existsSync(join(root, "maps"))).toBe(true);
   });
 

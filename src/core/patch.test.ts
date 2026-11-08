@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { describeOp } from "./describe";
 import { findLoops } from "./loops";
 import { PatchError, applyOps, edgeActionOps, makePatch, planDecisions, resolvePatch } from "./patch";
 import { Patch as PatchSchema, Version as VersionSchema, type Graph, type PatchOp } from "./schema";
@@ -254,6 +255,15 @@ describe("edgeActionOps（点按按钮）", () => {
     expect(edgeActionOps({ id: "e1", polarity: "?" }, "flip_polarity", { polarity: "-" })).toEqual([
       { op: "update_edge", id: "e1", polarity: "-" },
     ]);
+  });
+});
+
+describe("describeOp（补丁预览文字）", () => {
+  it("修改操作写出具体改了什么", () => {
+    const g = makeGraph(["房价", "购房需求"], ["n2->n1 +"]);
+    expect(describeOp({ op: "update_edge", id: "e1", polarity: "-", delay: true, note: "看起来要好几年" }, g)).toBe("修改关系「购房需求 →(+) 房价」：极性 + → −，标记延迟，笔记改为「看起来要好几年」");
+    expect(describeOp({ op: "update_edge", id: "e1", rationale: "需求多了价格涨" }, g)).toBe("修改关系「购房需求 →(+) 房价」：理由改为「需求多了价格涨」");
+    expect(describeOp({ op: "update_node", id: "n1", label: "住房价格", note: "" }, g)).toBe("修改变量「房价」：改名为「住房价格」，笔记改为「（空）」");
   });
 });
 

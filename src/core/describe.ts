@@ -3,6 +3,7 @@ import { findLoops, type Loop } from "./loops";
 import type { Graph, GraphEdge, OpDecision, PatchOp } from "./schema";
 
 const POL: Record<string, string> = { "+": "+", "-": "−", "?": "?" };
+const clip = (t: string, n = 60) => (t.length > n ? `${t.slice(0, n)}…` : t || "（空）");
 
 /** 节点标签查找：先查本补丁的 $ref，再查图 */
 export function labeler(graph: Graph, ops: readonly PatchOp[] = []) {
@@ -28,7 +29,7 @@ export function describeOp(op: PatchOp, graph: Graph, patchOps: readonly PatchOp
     case "add_node":
       return `新增变量「${op.label}」`;
     case "update_node":
-      return `修改变量「${label(op.id)}」${op.label ? ` → 「${op.label}」` : ""}${op.note !== undefined ? "（笔记）" : ""}`;
+      return `修改变量「${label(op.id)}」：${[op.label && `改名为「${op.label}」`, op.note !== undefined && `笔记改为「${clip(op.note)}」`].filter(Boolean).join("，")}`;
     case "remove_node":
       return `去掉变量「${label(op.id)}」`;
     case "merge_nodes":
@@ -36,13 +37,14 @@ export function describeOp(op: PatchOp, graph: Graph, patchOps: readonly PatchOp
     case "add_edge":
       return `新增关系「${edgeText(op, label)}」${op.delay ? " ‖延迟" : ""}${op.contested ? " ⚑有争议" : ""}`;
     case "update_edge": {
+      const before = edge(op.id);
       const changes = [
-        op.polarity && `极性改为 ${POL[op.polarity]}`,
+        op.polarity && `极性${before ? ` ${POL[before.polarity]}` : ""} → ${POL[op.polarity]}`,
         op.delay !== undefined && (op.delay ? "标记延迟" : "取消延迟"),
         op.status && { accepted: "同意", uncertain: "标为不确定", rejected: "拒绝" }[op.status],
         op.contested !== undefined && (op.contested ? "标为有争议" : "取消争议"),
-        op.rationale !== undefined && "修改理由",
-        op.note !== undefined && "修改笔记",
+        op.rationale !== undefined && `理由改为「${clip(op.rationale)}」`,
+        op.note !== undefined && `笔记改为「${clip(op.note)}」`,
       ].filter(Boolean);
       return `修改关系${edgeById(op.id)}：${changes.join("，")}`;
     }

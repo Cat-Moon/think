@@ -18,6 +18,16 @@ export interface TurnContext {
   retryErrors?: readonly string[];
 }
 
+/**
+ * 回合长短，用于选择思考程度（设计文档第 8.1.1 节）。
+ * 长：种子图（图为空时，可能是澄清也可能是种子图，按长处理）和一般的补充请求；
+ * 短：用户在问"为什么"、请求解释。
+ */
+export function turnLength(graph: Graph, userText: string): "short" | "long" {
+  if (isSeedTurn(graph)) return "long";
+  return /^s*(为什么|为何|怎么理解|能不能解释|请解释|解释一下|why)|为什么你(认为|觉得)/i.test(userText) ? "short" : "long";
+}
+
 /** 图中还没有任何有效变量：下一个补丁是种子图 */
 export const isSeedTurn = (g: Graph) => !g.nodes.some((n) => n.status === "accepted");
 

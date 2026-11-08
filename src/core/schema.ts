@@ -225,6 +225,10 @@ export const Version = z
 export const WorkspaceConfig = z.object({
   schema_version: z.literal(SCHEMA_VERSION),
   default_model: z.string().default("sonnet"),
+  /** 短回合（澄清、回答"为什么"）的思考程度；null 表示用 CLI 默认 */
+  effort_short: z.string().nullable().default("low"),
+  /** 长回合（种子图、补充）的思考程度；null 表示用 CLI 默认 */
+  effort_long: z.string().nullable().default(null),
   privacy_notice_seen: z.boolean().default(false),
 });
 

@@ -3,7 +3,7 @@
 // 输入不会丢：用户消息在调用 AI 之前就写入 conversation.jsonl。
 // 如果 AI 调用失败或被取消，这条消息留在对话末尾、没有 AI 回复；
 // 之后调用 takeTurn 且不传 userText，就会对这条消息重试。
-import { buildTurnPrompt } from "../../core/ai-context";
+import { buildTurnPrompt, turnLength } from "../../core/ai-context";
 import { checkAiOutput, errorsOf, sanitizeAiOutput, warningsOf, type Violation } from "../../core/ai-check";
 import { nextSeqId } from "../../core/ids";
 import { makePatch } from "../../core/patch";
@@ -14,13 +14,17 @@ import { ERROR_TEXT, ZERO_USAGE, addUsage, type AgentProvider, type LLMErrorKind
 import { loadSystemPrompt, type SystemPrompt } from "./system-prompt";
 
 export const MAX_ATTEMPTS = 2;
+/** 每次调用的时间上限（设计文档第 8.1.1 节） */
+export const CALL_TIMEOUT_MS = 180_000;
 
 export interface TurnOptions {
   /** 新的用户消息；不传则对对话末尾那条没有回复的用户消息重试 */
   userText?: string;
   model?: string;
-  /** 思考程度（low / medium / high …）；不传则用 CLI 默认 */
+  /** 思考程度（low / medium / high …）；优先于 effortPolicy；都不传则用 CLI 默认 */
   effort?: string;
+  /** 按回合长短选择思考程度（来自 workspace.json 的 effort_short / effort_long） */
+  effortPolicy?: { short: string | null; long: string | null };
   signal?: AbortSignal;
   timeoutMs?: number;
   systemPrompt?: SystemPrompt;
@@ -94,6 +98,8 @@ export async function takeTurn(dir: string, provider: AgentProvider, opts: TurnO
   }
 
   // 2. 调用 AI，检查，必要时带着问题重试一次
+  const policy = opts.effortPolicy;
+  const effort = opts.effort ?? (policy ? (turnLength(graph, userTurn.text) === "short" ? policy.short : policy.long) ?? undefined : undefined);
   const attempts: AttemptRecord[] = [];
   let usage = ZERO_USAGE;
   let retryErrors: string[] | undefined;
@@ -108,9 +114,9 @@ export async function takeTurn(dir: string, provider: AgentProvider, opts: TurnO
       prompt,
       jsonSchema: aiOutputJsonSchema(),
       model,
-      effort: opts.effort,
+      effort,
       signal: opts.signal,
-      timeoutMs: opts.timeoutMs,
+      timeoutMs: opts.timeoutMs ?? CALL_TIMEOUT_MS,
     });
     const record: AttemptRecord = { attempt, durationMs: res.durationMs, usage: res.ok ? res.usage : ZERO_USAGE, violations: [] };
     attempts.push(record);
@@ -130,7 +136,7 @@ export async function takeTurn(dir: string, provider: AgentProvider, opts: TurnO
       ts: now(),
       provider: provider.name,
       model,
-      effort: opts.effort ?? null,
+      effort: effort ?? null,
       user_turn: userTurn.turn_id,
       attempt,
       system_prompt_sha: system.sha,

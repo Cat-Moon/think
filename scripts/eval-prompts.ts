@@ -106,7 +106,7 @@ async function shadowAnswer(dir: string, graph: Graph, shadowModel: string): Pro
   const log = readFileSync(paths(dir).providerLog, "utf8").trim().split("\n").map((l) => JSON.parse(l) as { prompt: string });
   const prompt = log.at(-1)!.prompt;
   const patches = await Promise.all((await listPatchIds(dir)).map((id) => readPatch(dir, id)));
-  const res = await provider.complete({ systemPrompt: system.text, prompt, jsonSchema: aiOutputJsonSchema(), model: shadowModel, timeoutMs: 300_000 });
+  const res = await provider.complete({ systemPrompt: system.text, prompt, jsonSchema: aiOutputJsonSchema(), model: shadowModel, timeoutMs: 180_000 });
   if (!res.ok) return { model: shadowModel, durationMs: res.durationMs, outTokens: 0, violations: [], error: res.error.message };
   const z = AiOutput.safeParse(res.output);
   if (!z.success) return { model: shadowModel, durationMs: res.durationMs, outTokens: res.usage.outputTokens, violations: [], error: "输出格式不对" };
@@ -128,7 +128,7 @@ async function runSession(topic: Topic, run: number): Promise<Session> {
 
   const send = async (label: string, userText: string, decide: (p: Patch) => Choices) => {
     const graphBefore = await readGraph(map.dir);
-    const result = await takeTurn(map.dir, provider, { userText, model, effort, systemPrompt: system, timeoutMs: 300_000 });
+    const result = await takeTurn(map.dir, provider, { userText, model, effort, systemPrompt: system });
     const round: Round = { label, userText, result, graphBefore };
     s.rounds.push(round);
     if (result.ok && result.patch) {
@@ -193,6 +193,7 @@ const CODE_NAMES: Record<ViolationCode, string> = {
   internal_id: "内部ID",
   ui_detail: "界面细节",
   reproposed_rejected: "重提被拒",
+  reversed_rejected: "反向重提",
   rejected_used_in_answer: "回答用被拒关系",
   rejected_bypass: "绕道重提",
 };
@@ -389,7 +390,9 @@ await Promise.all(
 
 const order = (s: Session) => topics.indexOf(s.topic) * 100 + s.run;
 sessions.sort((a, b) => order(a) - order(b));
-const before = args.compare ? (JSON.parse(readFileSync(args.compare, "utf8")) as Stats[]) : null;
+// 只和本次跑过的主题对比（以及 --include 并入的主题），否则平均值没有可比性
+const comparedTopics = new Set([...topics.map((t) => t.id), ...(args.include ? args.include.split(/:(?=[^\/]*$)/)[1]!.split(",") : [])]);
+const before = args.compare ? (JSON.parse(readFileSync(args.compare, "utf8")) as Stats[]).filter((x) => comparedTopics.has(x.topic!)) : null;
 let included: Stats[] = [];
 if (args.include) {
   const [file, ids] = args.include.split(/:(?=[^\/]*$)/);

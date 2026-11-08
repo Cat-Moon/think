@@ -28,6 +28,7 @@ export type ViolationCode =
   | "internal_id" // 显示文字里出现内部 ID（已自动替换）
   | "ui_detail" // 提到界面细节（颜色、按钮等）
   | "reproposed_rejected" // 重新提出用户拒绝过的内容
+  | "reversed_rejected" // 用反向关系（B→A）变相重提被拒绝的 A→B
   | "rejected_used_in_answer" // 回答中可能把被拒绝的关系当作事实
   | "rejected_bypass"; // 被拒绝的 A→B 经由新变量形成了 A ⇝ B 的路径
 
@@ -53,6 +54,28 @@ const REGION_WORDS =
   /中国|美国|日本|英国|德国|法国|韩国|印度|俄罗斯|欧洲|欧盟|北美|拉美|北京|上海|深圳|广州|香港|台湾|新加坡|加拿大|澳大利亚|共和党|民主党|国会|特朗普|拜登|户籍|户口|限购|公积金|土地财政|学区房|一线城市|二线城市|高考|内卷|America|China|Japan|Europe|Republican|Democrat|Congress/;
 const UI_WORDS = /橙色|红色|绿色|蓝色|黄色|灰色|颜色|虚线|实线|高亮|按钮|点击(?![率量])|界面|画布|标成.色/;
 const INTERNAL_ID = /(?<![A-Za-z0-9_])(?:[ne]\d+)(?![A-Za-z0-9_])|\$[^\s$，。、；：「」『』（）()《》,.;:!?！？"'“”]+/;
+
+/** 回答里承认了用户的拒绝 */
+const ACKNOWLEDGED_REJECTION = /你之前不同意|你不同意|你拒绝了|你之前拒绝|被你拒绝/;
+/** 因果陈述用的动词 */
+const CAUSAL = /会|导致|推高|推动|拉动|带动|压低|抑制|增加|减少|提高|降低|促使|使得|使|让|造成|引起|影响|→/;
+/** 不是在陈述事实的句子（假设、提问、否定） */
+const HEDGED = /如果|假如|假设|是否|未必|不一定|并不|不会|没有|有人认为|也许/;
+
+/**
+ * 某一句话是否把"from 影响 to"当作成立来陈述：同一句中先出现 from、后出现 to，
+ * 两者之间有因果动词，且这句话不是假设、提问或否定。返回那句话，没有则返回 null。
+ */
+export function assertsCause(text: string, from: string, to: string): string | null {
+  for (const sentence of text.split(/[。！!；;\n]/)) {
+    const i = sentence.indexOf(from);
+    const j = i < 0 ? -1 : sentence.indexOf(to, i + from.length);
+    if (i < 0 || j < 0) continue;
+    if (/[?？]/.test(sentence) || HEDGED.test(sentence)) continue;
+    if (CAUSAL.test(sentence.slice(i + from.length, j))) return sentence.trim();
+  }
+  return null;
+}
 
 const countQuestions = (s: string) => (s.match(/[?？]/g) ?? []).length;
 const sentenceCount = (s: string) => s.split(/[。！？!?；;]+/).filter((x) => x.trim().length > 1).length;
@@ -125,13 +148,15 @@ export function checkAiOutput(out: AiOutput, graph: Graph, patches: readonly Pat
     if (op.op === "add_edge" && rejectedKeys.has(`edge:${normalizeLabel(label(op.from))}->${normalizeLabel(label(op.to))}`)) {
       push("reproposed_rejected", `关系「${label(op.from)} → ${label(op.to)}」之前被用户拒绝过`);
     }
+    if (op.op === "add_edge" && rejectedKeys.has(`edge:${normalizeLabel(label(op.to))}->${normalizeLabel(label(op.from))}`)) {
+      push("reversed_rejected", `用户拒绝过「${label(op.to)} → ${label(op.from)}」，这条反向关系可能是变相重提`);
+    }
   }
-  if (out.kind === "answer") {
+  if (out.kind === "answer" && !ACKNOWLEDGED_REJECTION.test(out.message)) {
     for (const r of rejected) {
       if (r.kind !== "edge" || !r.from || !r.to) continue;
-      if (out.message.includes(r.from) && out.message.includes(r.to) && !/不同意|拒绝|否定|不认同/.test(out.message)) {
-        push("rejected_used_in_answer", `回答同时提到了「${r.from}」和「${r.to}」，而用户拒绝过「${r.from} → ${r.to}」，但回答中没有说明`);
-      }
+      const s = assertsCause(out.message, r.from, r.to);
+      if (s) push("rejected_used_in_answer", `回答把用户拒绝过的「${r.from} → ${r.to}」当作成立来陈述：「${s.slice(0, 60)}」`);
     }
   }
 

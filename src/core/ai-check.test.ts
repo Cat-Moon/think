@@ -150,8 +150,22 @@ describe("被拒绝的内容", () => {
   });
 
   it("回答中提到被拒绝关系的两端却没有说明", () => {
-    expect(codes(answer("因为房价会压低购房需求。"), g0, [rejected])).toEqual(["warning:rejected_used_in_answer"]);
     expect(codes(answer("你之前不同意房价会影响购房需求，所以这里不依赖它。"), g0, [rejected])).toEqual([]);
+  });
+
+  it("只有把被拒关系当作成立来陈述才报警", () => {
+    // 同一句里先 from 后 to，中间有因果动词，没有假设或否定
+    expect(codes(answer("这样一来，房价走高会压低购房需求。"), g0, [rejected])).toEqual(["warning:rejected_used_in_answer"]);
+    // 只是同时提到两个变量、方向相反、假设、提问，都不报
+    for (const m of ["房价和购房需求都在图里。", "购房需求会推高房价。", "如果房价上涨，购房需求未必下降。", "房价的变化不一定影响购房需求。"]) {
+      expect(codes(answer(m), g0, [rejected]), m).toEqual([]);
+    }
+  });
+
+  it("用反向关系变相重提被拒绝的主张", () => {
+    expect(codes({ ops: [{ op: "add_edge", from: "n2", to: "n1", polarity: "+", rationale: "" }] }, makeGraph(["房价", "购房需求"]), [rejected])).toEqual([
+      "warning:reversed_rejected",
+    ]);
   });
 
   it("绕道：被拒绝的 A→B 经由新变量形成 A ⇝ B 的路径", () => {

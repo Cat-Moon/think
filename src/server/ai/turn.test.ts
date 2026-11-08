@@ -50,6 +50,7 @@ describe("takeTurn", () => {
     expect(log[0]).toMatchObject({ attempt: 1, ok: true, system_prompt_sha: "test", user_turn: "t001" });
     expect(log[0].prompt).toContain("用户的新消息：为什么我总是拖延");
     expect(provider.requests[0]?.systemPrompt).toBe("测试提示词");
+    expect(provider.requests[0]?.timeoutMs).toBe(180_000); // 每次调用的时间上限
   });
 
   it("澄清问题不产生补丁", async () => {
@@ -120,6 +121,14 @@ describe("takeTurn", () => {
     expect((await readConversation(dir)).items.map((t) => t.role)).toEqual(["user", "ai"]);
   });
 
+  it("超时：不重试，提示可以重试，用户消息保留", async () => {
+    const dir = await newMap();
+    const r = await takeTurn(dir, new FakeProvider([{ error: { kind: "timeout", message: "超时" } }]), { ...opts, userText: "拖延" });
+    expect(!r.ok && r.error.kind).toBe("timeout");
+    expect(r.attempts).toHaveLength(1);
+    expect((await readConversation(dir)).items.map((t) => t.text)).toEqual(["拖延"]);
+  });
+
   it("思考中可以取消，取消后用户消息保留", async () => {
     const dir = await newMap();
     const ac = new AbortController();
@@ -144,6 +153,19 @@ describe("takeTurn", () => {
 
   it("没有可重试的消息时报错", async () => {
     await expect(takeTurn(await newMap(), new FakeProvider([]), opts)).rejects.toThrow(/没有需要重试/);
+  });
+});
+
+describe("思考程度按回合长短选择", () => {
+  it("种子轮用 long；问为什么用 short；显式 effort 优先", async () => {
+    const dir = await newMap();
+    const provider = new FakeProvider([{ output: seed }, { output: { ...clarify, kind: "answer", question: "" } }, { output: { ...clarify, kind: "answer", question: "" } }]);
+    const policy = { short: "low", long: null };
+    await takeTurn(dir, provider, { ...opts, userText: "为什么我总是拖延", effortPolicy: policy });
+    await commitPatch(dir, "p001", "all", "2026-11-08T06:01:00.000Z");
+    await takeTurn(dir, provider, { ...opts, userText: "为什么你认为焦虑会导致回避？", effortPolicy: policy });
+    await takeTurn(dir, provider, { ...opts, userText: "继续", effortPolicy: policy, effort: "high" });
+    expect(provider.requests.map((r) => r.effort)).toEqual([undefined, "low", "high"]);
   });
 });
 
