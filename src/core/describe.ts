@@ -24,7 +24,7 @@ export function describeOp(op: PatchOp, graph: Graph, patchOps: readonly PatchOp
   };
   switch (op.op) {
     case "set_frame":
-      return `设定框架：${[op.phenomenon && `现象「${op.phenomenon}」`, op.perspective && `视角「${op.perspective}」`, op.time_horizon && `时间「${op.time_horizon}」`].filter(Boolean).join("，")}`;
+      return `设定框架：${[op.phenomenon && `现象「${op.phenomenon}」`, op.perspective && `视角「${op.perspective}」`, op.time_horizon && `时间「${op.time_horizon}」`, op.context && `地区/语境「${op.context}」`].filter(Boolean).join("，")}`;
     case "add_node":
       return `新增变量「${op.label}」`;
     case "update_node":
@@ -65,9 +65,7 @@ export function renderGraph(graph: Graph, opts: { showRejected?: boolean; loops?
   const f = graph.frame;
   const lines: string[] = [];
   lines.push(`主题：${f.topic}`);
-  if (f.phenomenon || f.perspective || f.time_horizon) {
-    lines.push(`现象：${f.phenomenon || "（未定）"}｜视角：${f.perspective || "（未定）"}｜时间：${f.time_horizon || "（未定）"}`);
-  }
+  lines.push(`现象：${f.phenomenon || "（未定）"}｜视角：${f.perspective || "（未定）"}｜时间：${f.time_horizon || "（未定）"}｜地区/语境：${f.context || "未指定"}`);
   const nodes = graph.nodes.filter((n) => opts.showRejected || n.status === "accepted");
   lines.push(`变量（${nodes.length}）：${nodes.map((n) => `${n.label}${n.status === "rejected" ? "[已拒绝]" : ""}`).join("、") || "（无）"}`);
   const edges = graph.edges.filter((e) => opts.showRejected || e.status !== "rejected");

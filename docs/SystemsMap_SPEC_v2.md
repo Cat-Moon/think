@@ -128,6 +128,13 @@ AI 调用进行中时，图的编辑暂时锁定，避免补丁基于过期版�
 - 不重新提出用户已经拒绝过的内容，除非用户主动要求
 - 不自己判断回路极性；需要讨论回路时，使用上下文中由代码算出的回路
 - 使用用户使用的语言回复
+- 给用户看的文字中不出现内部 ID（n3、e5、$a）和界面细节（颜色、按钮等）；只描述"这个提议"，不预告图最终的结构
+- 每条理由不超过 2 句；"另一种解释"只在确实有实质分歧时才写
+- 不为了闭合回路而加边：只有输出没有输入的外生变量是合法的，新增的边必须有机制上的理由
+- 地区/语境未指定时不默认任何国家，理由中不写具体国家的事实；需要地区相关机制时，先问用户或在说明里写明假设
+- 有争议的主题：种子图至少覆盖两种不同类型的解释（媒体、身份认同、经济、制度、精英等），不替用户选边
+- 除非很确定，不引用具体的研究者或文献；引用时标注"AI 记忆，未核实"
+- 回答"为什么"时不把用户拒绝过的关系当作事实；相关时明确说"你之前不同意……"
 - 不下结论式断言，除非用户明确要求 AI 直接给出看法
 
 ### 5.2 两个模式
@@ -204,7 +211,8 @@ AI 调用进行中时，图的编辑暂时锁定，避免补丁基于过期版�
     "topic": "房价为什么持续上涨",
     "phenomenon": "房价随时间持续上升",
     "perspective": "城市居民",
-    "time_horizon": "20 年"
+    "time_horizon": "20 年",
+    "context": "未指定"
   },
   "nodes": [
     { "id": "n1", "label": "房价", "status": "accepted", "origin": "user", "note": "" }
@@ -233,7 +241,7 @@ AI 调用进行中时，图的编辑暂时锁定，避免补丁基于过期版�
 
 | 操作 | 字段 | 说明 |
 |---|---|---|
-| `set_frame` | `phenomenon?, perspective?, time_horizon?` | 设置或修改 Frame（种子补丁使用） |
+| `set_frame` | `phenomenon?, perspective?, time_horizon?, context?` | 设置或修改 Frame（种子补丁使用）；`context` 是地区/语境，默认"未指定" |
 | `add_node` | `ref, label, rationale?` | `ref` 形如 `$a`，代码分配真实 ID |
 | `update_node` | `id, label?, note?` | 改名或改笔记 |
 | `remove_node` | `id, reason?` | 置为 `rejected`（保留记录） |
@@ -323,7 +331,7 @@ MVP 有两个实现：`FakeProvider`（测试和界面开发用，返回预设�
 ### 8.1 ClaudeCodeProvider 调用方式（2026-11-08 查阅官方文档，并在本机 CLI 2.1.158 实测）
 
 ```
-claude -p --output-format json
+claude -p --output-format stream-json --verbose
        --json-schema '<AI 输出的 JSON Schema>'
        --system-prompt '<Think 的系统提示词>'
        --tools ""                  # 禁用全部内置工具
@@ -331,6 +339,7 @@ claude -p --output-format json
        --setting-sources ""        # 不加载用户 / 项目设置
        --no-session-persistence    # 不保存会话
        --model sonnet              # 默认 sonnet，可切换
+       [--effort low]              # 可选：降低思考程度
 ```
 
 - 提示词内容通过 **stdin** 传入（避免 Windows 命令行长度和中文转义问题）
@@ -342,22 +351,26 @@ claude -p --output-format json
 - 登录检查：`claude auth status`（输出 JSON，`authMethod` 为 `claude.ai` 表示订阅登录；本机实测可用）
 - Windows 上 npm 安装的 `claude` 是 `.cmd` 包装脚本，经 cmd.exe 传递 JSON Schema 难以正确转义，因此直接调用它包装的 `claude.exe`（可用环境变量 `THINK_CLAUDE_BIN` 指定）
 - 实测延迟：haiku 约 9 秒；sonnet 单次 10–50 秒。界面需显示"思考中"、可以取消，失败后不丢失用户输入
+- **流式输出（2026-11-08 查阅文档并实测）**：`--output-format stream-json --verbose` 每行一个事件，最后一行是 `result`，实测其中带有 `structured_output`。加 `--include-partial-messages` 后会逐段输出 `stream_event`（`thinking_delta`、`text_delta`、`input_json_delta`）。按文档，结构化输出以内部的 `StructuredOutput` 工具调用返回，流式片段是**未校验**的 JSON，只有 `result.structured_output` 是校验过的。M5 可用这些事件在界面上显示"正在思考 / 正在写"，最终仍以 `result` 为准
+- 使用 `stream-json` 的另一个好处：AI 提交的结构化输出被 CLI 拒绝时，事件流中的 `tool_result`（`is_error: true`）带有校验错误，记入日志便于诊断
+- sonnet 默认会先"思考"（事件流中有大量 `thinking_delta`），这是延迟的主要来源；`--effort` 可降低思考程度
 
 ### 8.1.1 一轮对话的流程（`src/server/ai/turn.ts`）
 
 1. 如果还有未处理的补丁，拒绝开始新一轮（先处理上一轮的建议）
 2. **先把用户消息写入 `conversation.jsonl`**，再调用 AI。调用失败、被取消或额度用尽时，这条消息留在对话末尾、没有 AI 回复；之后不带新消息再调用一次，就会对它重试——输入不会丢
 3. 用 `core/ai-context.ts` 组装上下文（第 5.4 节），系统提示词每次从 `prompts/system.md` 读取（修改后无需重启）
-4. 调用 provider；用 zod 和 `core/ai-check.ts` 检查输出。有 error 级问题时，把问题列表附在上下文末尾重试一次；仍不合格则返回最后一次输出和问题列表给界面展示，不保存补丁
-5. 取消、超时、未登录、额度用尽这几类错误不重试，直接返回，界面提示后由用户决定何时重试
+4. 调用 provider；用 zod 和 `core/ai-check.ts` 检查输出。**只有硬性违规才重试**（见 8.1.2），重试一次，把问题列表附在上下文末尾；仍不合格则返回最后一次输出和问题列表给界面展示，不保存补丁。软性违规只作为警告返回（补丁预览中显示），不重试
+5. 保存前对显示文字做安全网替换：内部 ID（n5、e3、$ref）换成「变量名」或「A → B」这条关系
+6. 取消、超时、未登录、额度用尽这几类错误不重试，直接返回，界面提示后由用户决定何时重试；用户消息已保存，重试时不丢输入
 6. 通过检查后：`kind=patch` 时保存补丁（未处理），再追加 AI 回复（关联补丁）
 
 ### 8.1.2 AI 输出检查（`src/core/ai-check.ts`）
 
 | 级别 | 检查项 |
 |---|---|
-| error（重试） | 补丁无法应用（引用不存在、重名、重复关系等，通过试应用发现）；`kind` 与 `ops` 不匹配；非种子轮新增超过 3 个；种子图变量不在 3–5 个之间；种子图闭环多于 1 个；`question` 中多于一个问号，或 `message` 中有问号；`clarify` / `patch` 没有问题 |
-| warning（记录并提示） | 文字中出现回路字眼（回路、反馈、循环、增强、平衡、loop、feedback 等）；变量名带方向；标了 `contested` 但理由中没写争议所在；重新提出用户拒绝过的变量或关系（按归一化标签比较） |
+| 硬性违规（重试一次） | JSON 不合法（含 CLI 的 `error_max_structured_output_retries`）；`kind` 与 `ops` 不匹配；补丁无法应用（引用不存在、重名、重复关系等，通过试应用发现）；非种子轮新增超过 3 个，或种子图变量超过 5 个；`question` 字段中多于一个问号 |
+| 软性违规（只记录） | `message` 里夹带问题；缺少问题；种子图变量少于 3 个或闭环多于 1 个；回路说法（具体短语：回路、闭环、闭合、正反馈、负反馈、恶性循环、良性循环、自我强化、新的结构、loop 等；单独的"增强""反馈"不算）；变量名带方向；标了 `contested` 但理由中没写争议所在；理由超过 2 句；引用具体研究者或文献但没标注"AI 记忆，未核实"；地区未指定却出现具体国家或地区制度；显示文字中出现内部 ID（已自动替换）；提到界面细节；重新提出被拒绝的变量或关系；回答中可能把被拒绝的关系当作事实；**绕道**：被拒绝的 A→B 经由本补丁的新变量形成了 A ⇝ B 的路径（补丁预览中提示，不阻止） |
 
 ### 8.1.3 提示词回归（`scripts/eval-prompts.ts`）
 
@@ -533,6 +546,13 @@ Workspace/
    - 变量名带方向（用 `validate.ts` 的词表）
    - 乱标争议（标了 `contested` 但理由中没有说明争议）
 4. **"思考中"状态**：AI 调用期间界面显示"思考中"，可以取消（终止 CLI 子进程），取消或失败时用户输入不能丢（M3 做好 provider 层的取消与错误返回，M5 接到界面）
+
+### M3 提示词调整后的回归结论（2026-11-08）
+
+- 21 次会话、90 次调用：0 重试、0 失败（调整前：5 轮重试、2 轮失败）；软性违规合计 7 处
+- 偶发的 `error_max_structured_output_retries` 已查明：AI 向结构化输出工具提交了空对象 `{}`；现在作为硬性违规由我们重试一次
+- 速度：缩短理由没有明显缩短耗时（单次约 35 秒），主要耗时在模型的"思考"阶段。快速试跑中 `--effort low` 使单次调用从约 42 秒降到约 19 秒、输出 token 减少约 60%，质量需进一步确认
+- "为什么"轮次用 haiku 对照：反而更慢（约 18.5 秒对 13.9 秒），输出 token 约为 sonnet 的 3 倍，不采用
 
 ### 第二阶段：学习功能
 「我先想」模式与对比；边的置信度（多次采样）；版本对比视图；争议性主题的双方观点展示；导出（PNG / SVG / JSON / Mermaid）。

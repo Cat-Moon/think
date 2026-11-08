@@ -6,6 +6,8 @@ export interface LLMRequest {
   prompt: string;
   jsonSchema: object;
   model: string;
+  /** 思考程度（low / medium / high …）；不传则用默认 */
+  effort?: string;
   signal?: AbortSignal;
   timeoutMs?: number;
 }
@@ -23,6 +25,7 @@ export type LLMErrorKind =
   | "auth" // 未登录或登录失效
   | "rate_limit" // 订阅额度用尽或请求过快
   | "no_output" // 正常结束但没有结构化输出（例如 AI 拒绝回答）
+  | "schema_failure" // AI 多次提交不符合 JSON Schema 的输出（CLI 报 error_max_structured_output_retries）；会重试一次
   | "not_installed" // 找不到 claude
   | "cli_error"; // 其他错误
 
@@ -64,6 +67,7 @@ export const ERROR_TEXT: Record<LLMErrorKind, string> = {
   auth: "Claude Code 未登录或登录已失效，请在终端运行 claude 并登录",
   rate_limit: "订阅额度已用完或请求过于频繁，请稍后再试",
   no_output: "AI 没有给出结构化的回复",
+  schema_failure: "AI 的输出多次不符合格式",
   not_installed: "找不到 Claude Code CLI",
   cli_error: "调用 Claude Code 时出错",
 };

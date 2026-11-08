@@ -37,7 +37,7 @@ describe("resolvePatch：种子补丁", () => {
     expect(VersionSchema.safeParse(version).success).toBe(true);
 
     const g = version!.graph;
-    expect(g.frame).toEqual({ topic: "房价为什么持续上涨", phenomenon: "房价随时间持续上升", perspective: "城市居民", time_horizon: "20 年" });
+    expect(g.frame).toEqual({ topic: "房价为什么持续上涨", phenomenon: "房价随时间持续上升", perspective: "城市居民", time_horizon: "20 年", context: "未指定" });
     expect(g.nodes.map((n) => `${n.id}:${n.label}:${n.origin}`)).toEqual(["n1:房价:ai", "n2:购房需求:ai", "n3:涨价预期:ai"]);
     expect(g.edges.map((e) => `${e.id}:${e.from}->${e.to}`)).toEqual(["e1:n2->n1", "e2:n1->n3", "e3:n3->n2"]);
     expect(g.edges[1]?.delay).toBe(true);

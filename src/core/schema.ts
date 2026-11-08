@@ -4,6 +4,11 @@ import { z } from "zod";
 
 export const SCHEMA_VERSION = 1;
 
+/** 地区 / 语境未指定时的值 */
+export const UNSPECIFIED_CONTEXT = "未指定";
+/** AI 常写成"未指定地区""未指定（不默认任何国家）"，以"未指定"开头都算未指定 */
+export const isContextUnspecified = (c: string | undefined) => !c || !c.trim() || c.trim().startsWith(UNSPECIFIED_CONTEXT);
+
 // ---------- ID ----------
 
 export const NodeId = z.string().regex(/^n\d+$/, "节点 ID 形如 n1");
@@ -31,6 +36,8 @@ export const Frame = z.object({
   phenomenon: z.string().default(""),
   perspective: z.string().default(""),
   time_horizon: z.string().default(""),
+  /** 地区 / 语境（国家、城市、群体等）；AI 不得默认某个国家 */
+  context: z.string().default(UNSPECIFIED_CONTEXT),
 });
 
 export const GraphNode = z.object({
@@ -88,6 +95,7 @@ export const SetFrameOp = z.object({
   phenomenon: z.string().optional(),
   perspective: z.string().optional(),
   time_horizon: z.string().optional(),
+  context: z.string().optional(),
 });
 
 export const AddNodeOp = z.object({

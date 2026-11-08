@@ -1,5 +1,5 @@
 // ClaudeCodeProvider：通过本机已登录的 Claude Code CLI 调用（设计文档第 8.1 节）。
-import { printArgs, runClaude, type RunResult } from "../claude-cli";
+import { parseStream, printArgs, runClaude, type RunResult } from "../claude-cli";
 import { ERROR_TEXT, ZERO_USAGE, type AgentProvider, type LLMErrorKind, type LLMRequest, type LLMResponse, type ProviderStatus, type Usage } from "./provider";
 
 function parseUsage(u: unknown): Usage {
@@ -18,12 +18,8 @@ export function classify(run: RunResult): { kind: LLMErrorKind; message: string 
   if (run.killedBy === "abort") return { kind: "cancelled", message: ERROR_TEXT.cancelled };
   if (run.killedBy === "timeout") return { kind: "timeout", message: ERROR_TEXT.timeout };
 
-  let json: Record<string, unknown> | null = null;
-  try {
-    json = JSON.parse(run.stdout) as Record<string, unknown>;
-  } catch {
-    // 下面处理
-  }
+  const parsed = parseStream(run.stdout);
+  const json = parsed.result;
   const text = `${json ? String(json.result ?? "") : run.stdout}\n${run.stderr}`;
   const status = json?.api_error_status;
   if (status === 429 || /usage limit|rate limit|limit reached|额度/i.test(text)) return { kind: "rate_limit", message: ERROR_TEXT.rate_limit };
@@ -31,6 +27,10 @@ export function classify(run: RunResult): { kind: LLMErrorKind; message: string 
     return { kind: "auth", message: ERROR_TEXT.auth };
   }
   if (!json) return { kind: "cli_error", message: `${ERROR_TEXT.cli_error}：${(run.stderr || run.stdout).trim().slice(0, 500) || `退出码 ${run.exitCode}`}` };
+  if (json.subtype === "error_max_structured_output_retries") {
+    const why = parsed.structuredErrors.at(-1);
+    return { kind: "schema_failure", message: `${ERROR_TEXT.schema_failure}${why ? `：${why.slice(0, 300)}` : ""}` };
+  }
   if (json.is_error) return { kind: "cli_error", message: `${ERROR_TEXT.cli_error}：${String(json.result ?? json.subtype ?? "").slice(0, 500)}` };
   if (json.structured_output === undefined) {
     return { kind: "no_output", message: `${ERROR_TEXT.no_output}${json.result ? `：${String(json.result).slice(0, 300)}` : ""}` };
@@ -80,14 +80,13 @@ export class ClaudeCodeProvider implements AgentProvider {
     }
     const durationMs = Date.now() - t0;
     const error = classify(run);
-    let raw: unknown = run.stdout;
-    try {
-      raw = JSON.parse(run.stdout);
-    } catch {
-      // 保留原文
-    }
+    const parsed = parseStream(run.stdout);
+    // 日志只记 result 行、格式校验错误和额度信息，不记整个事件流
+    const raw = parsed.result
+      ? { ...parsed.result, structured_output_errors: parsed.structuredErrors, structured_output_attempts: parsed.structuredAttempts, rate_limit_event: parsed.rateLimit }
+      : { stdout: run.stdout.slice(0, 2000), stderr: run.stderr.slice(0, 2000) };
     if (error) return { ok: false, error, durationMs, raw };
-    const json = raw as Record<string, unknown>;
+    const json = parsed.result!;
     return { ok: true, output: json.structured_output, usage: json.usage ? parseUsage(json.usage) : ZERO_USAGE, durationMs, raw };
   }
 }

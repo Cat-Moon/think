@@ -4,7 +4,7 @@
 // 如果 AI 调用失败或被取消，这条消息留在对话末尾、没有 AI 回复；
 // 之后调用 takeTurn 且不传 userText，就会对这条消息重试。
 import { buildTurnPrompt } from "../../core/ai-context";
-import { checkAiOutput, errorsOf, warningsOf, type Violation } from "../../core/ai-check";
+import { checkAiOutput, errorsOf, sanitizeAiOutput, warningsOf, type Violation } from "../../core/ai-check";
 import { nextSeqId } from "../../core/ids";
 import { makePatch } from "../../core/patch";
 import { AiOutput, aiOutputJsonSchema, type Patch, type Turn } from "../../core/schema";
@@ -19,6 +19,8 @@ export interface TurnOptions {
   /** 新的用户消息；不传则对对话末尾那条没有回复的用户消息重试 */
   userText?: string;
   model?: string;
+  /** 思考程度（low / medium / high …）；不传则用 CLI 默认 */
+  effort?: string;
   signal?: AbortSignal;
   timeoutMs?: number;
   systemPrompt?: SystemPrompt;
@@ -106,6 +108,7 @@ export async function takeTurn(dir: string, provider: AgentProvider, opts: TurnO
       prompt,
       jsonSchema: aiOutputJsonSchema(),
       model,
+      effort: opts.effort,
       signal: opts.signal,
       timeoutMs: opts.timeoutMs,
     });
@@ -127,6 +130,7 @@ export async function takeTurn(dir: string, provider: AgentProvider, opts: TurnO
       ts: now(),
       provider: provider.name,
       model,
+      effort: opts.effort ?? null,
       user_turn: userTurn.turn_id,
       attempt,
       system_prompt_sha: system.sha,
@@ -141,6 +145,13 @@ export async function takeTurn(dir: string, provider: AgentProvider, opts: TurnO
     });
 
     if (!res.ok) {
+      // JSON 格式不合法属于硬性违规：带着校验错误重试一次
+      if (res.error.kind === "schema_failure" && attempt < MAX_ATTEMPTS) {
+        retryErrors = [
+          `上一次提交的输出不符合格式（${res.error.message}）。提交的参数必须直接是包含 kind、message、question、ops、possible_duplicates 五个字段的 JSON 对象，不要包在其他字段里`,
+        ];
+        continue;
+      }
       // 取消、额度、登录等问题不重试；用户消息已保存，可稍后重试
       return { ok: false, error: res.error, ...base() };
     }
@@ -165,7 +176,8 @@ export async function takeTurn(dir: string, provider: AgentProvider, opts: TurnO
   }
 
   // 3. 保存补丁和 AI 回复
-  const { output } = last;
+  // 安全网：显示文字中的内部 ID（n5、e3、$ref）替换成变量名；检查结果仍基于原始输出
+  const output = sanitizeAiOutput(last.output, graph);
   let patch: Patch | null = null;
   const aiTurnId = nextSeqId(userTurn.turn_id); // 用户消息总是对话的最后一条
   if (output.kind === "patch") {

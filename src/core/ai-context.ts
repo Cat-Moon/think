@@ -2,7 +2,7 @@
 import { describeOp, edgeText, labeler } from "./describe";
 import { idNumber } from "./ids";
 import { findLoops } from "./loops";
-import type { Graph, Patch, Turn } from "./schema";
+import { isContextUnspecified, type Graph, type Patch, type Turn } from "./schema";
 import { normalizeLabel } from "./validate";
 
 export const RECENT_TURNS = 8;
@@ -27,6 +27,9 @@ export interface RejectedItem {
   /** 用于比较是否被重新提出：变量为归一化标签，关系为 "from标签->to标签" */
   key: string;
   reason?: string;
+  /** 关系两端的变量名（kind 为 edge 时） */
+  from?: string;
+  to?: string;
 }
 
 const edgeKey = (from: string, to: string) => `${normalizeLabel(from)}->${normalizeLabel(to)}`;
@@ -49,7 +52,7 @@ export function rejectedItems(graph: Graph, patches: readonly Patch[]): Rejected
       if (op.op === "add_node" && !d.auto) {
         add({ kind: "node", text: `变量「${op.label}」`, key: normalizeLabel(op.label), reason: d.reason });
       } else if (op.op === "add_edge" && !d.auto) {
-        add({ kind: "edge", text: `关系「${edgeText(op, opLabel)}」`, key: edgeKey(opLabel(op.from), opLabel(op.to)), reason: d.reason });
+        add({ kind: "edge", text: `关系「${edgeText(op, opLabel)}」`, key: edgeKey(opLabel(op.from), opLabel(op.to)), reason: d.reason, from: opLabel(op.from), to: opLabel(op.to) });
       }
     }
   }
@@ -60,7 +63,7 @@ export function rejectedItems(graph: Graph, patches: readonly Patch[]): Rejected
     }
   }
   for (const e of graph.edges) {
-    if (e.status === "rejected") add({ kind: "edge", text: `关系「${edgeText(e, label)}」`, key: edgeKey(label(e.from), label(e.to)) });
+    if (e.status === "rejected") add({ kind: "edge", text: `关系「${edgeText(e, label)}」`, key: edgeKey(label(e.from), label(e.to)), from: label(e.from), to: label(e.to) });
   }
   return [...out.values()];
 }
@@ -90,7 +93,7 @@ export function buildTurnPrompt(ctx: TurnContext): string {
   const sections: string[] = [];
 
   sections.push(
-    `## 主题框架\n主题：${f.topic}\n现象：${f.phenomenon || "（未定）"}\n视角：${f.perspective || "（未定）"}\n时间范围：${f.time_horizon || "（未定）"}`,
+    `## 主题框架\n主题：${f.topic}\n现象：${f.phenomenon || "（未定）"}\n视角：${f.perspective || "（未定）"}\n时间范围：${f.time_horizon || "（未定）"}\n地区/语境：${f.context || "未指定"}${isContextUnspecified(f.context) ? "（不要默认任何国家；理由中不要写具体国家的事实）" : ""}`,
   );
   sections.push(`## 当前的图（版本 ${graph.version}）\n${graphForAi(graph)}`);
 

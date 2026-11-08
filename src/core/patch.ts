@@ -111,7 +111,7 @@ export function applyOps(graph: Graph, ops: readonly { index: number; op: PatchO
   for (const { index: i, op } of ops) {
     switch (op.op) {
       case "set_frame": {
-        for (const k of ["phenomenon", "perspective", "time_horizon"] as const) {
+        for (const k of ["phenomenon", "perspective", "time_horizon", "context"] as const) {
           if (op[k] !== undefined) g.frame[k] = op[k];
         }
         break;

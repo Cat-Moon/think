@@ -96,13 +96,20 @@ export interface PrintOptions {
   systemPrompt: string;
   jsonSchema: object;
   model: string;
+  /** 思考程度：low / medium / high …；不传则用 CLI 默认 */
+  effort?: string;
 }
 
-/** 单次、无状态、禁用工具的结构化输出调用所用的参数 */
+/**
+ * 单次、无状态、禁用工具的结构化输出调用所用的参数。
+ * 用 stream-json（需要 --verbose）：最后一行是 result（含 structured_output），
+ * 中间的 StructuredOutput 工具结果会带出格式校验失败的原因，便于诊断。
+ */
 export function printArgs(opts: PrintOptions): string[] {
   return [
     "-p",
-    "--output-format", "json",
+    "--output-format", "stream-json",
+    "--verbose",
     "--json-schema", JSON.stringify(opts.jsonSchema),
     "--system-prompt", opts.systemPrompt,
     "--tools", "",
@@ -110,5 +117,50 @@ export function printArgs(opts: PrintOptions): string[] {
     "--setting-sources", "",
     "--no-session-persistence",
     "--model", opts.model,
+    ...(opts.effort ? ["--effort", opts.effort] : []),
   ];
+}
+
+export interface ParsedStream {
+  /** 最后的 result 消息（没有则为最后一个能解析的 JSON 行） */
+  result: Record<string, unknown> | null;
+  /** StructuredOutput 被拒时的校验错误（tool_result 的 is_error） */
+  structuredErrors: string[];
+  /** AI 每次提交给 StructuredOutput 工具的参数（截断），用于诊断格式错误 */
+  structuredAttempts: string[];
+  /** CLI 报告的额度信息（rate_limit_event） */
+  rateLimit: unknown;
+}
+
+/** 解析 stream-json 输出（也兼容单个 JSON 对象） */
+export function parseStream(stdout: string): ParsedStream {
+  const out: ParsedStream = { result: null, structuredErrors: [], structuredAttempts: [], rateLimit: null };
+  let last: Record<string, unknown> | null = null;
+  for (const line of stdout.split("\n")) {
+    if (!line.trim()) continue;
+    let m: Record<string, unknown>;
+    try {
+      m = JSON.parse(line) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    last = m;
+    if (m.type === "result") out.result = m;
+    if (m.type === "rate_limit_event") out.rateLimit = m;
+    const content = (m.message as { content?: unknown } | undefined)?.content;
+    if (m.type === "assistant" && Array.isArray(content)) {
+      for (const c of content as Record<string, unknown>[]) {
+        if (c.type === "tool_use") out.structuredAttempts.push(JSON.stringify(c.input).slice(0, 1500));
+      }
+    }
+    if (m.type === "user" && Array.isArray(content)) {
+      for (const c of content as Record<string, unknown>[]) {
+        if (c.type !== "tool_result" || !c.is_error) continue;
+        const text = typeof c.content === "string" ? c.content : JSON.stringify(c.content);
+        out.structuredErrors.push(text.slice(0, 1000));
+      }
+    }
+  }
+  out.result ??= last;
+  return out;
 }

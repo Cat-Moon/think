@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { AiOutput } from "../../core/schema";
+import { parseStream } from "../claude-cli";
 import { classify } from "./claude-provider";
 import { FakeProvider } from "./fake-provider";
 import { loadSystemPrompt } from "./system-prompt";
@@ -71,15 +72,38 @@ describe("takeTurn", () => {
 
   it("重试后仍不合格：不保存补丁，返回输出和问题，用户消息保留", async () => {
     const dir = await newMap();
-    const bad = { ...seed, ops: seed.ops.slice(0, 3) }; // 只有 2 个变量
+    const bad: AiOutput = { ...seed, ops: [...seed.ops, { op: "add_edge", from: "n9", to: "$a", polarity: "+", rationale: "" }] }; // 引用不存在的变量
     const r = await takeTurn(dir, new FakeProvider([{ output: bad }, { output: bad }]), { ...opts, userText: "拖延" });
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error.kind).toBe("invalid_output");
     expect(r.output).toEqual(bad);
-    expect(r.violations?.map((v) => v.code)).toEqual(["seed_size"]);
+    expect(r.violations?.map((v) => v.code)).toEqual(["invalid_ops"]);
     expect(await listPatchIds(dir)).toEqual([]);
     expect((await readConversation(dir)).items.map((t) => t.role)).toEqual(["user"]);
+  });
+
+  it("软性违规不重试，只作为警告返回；保存的文字中内部 ID 已替换", async () => {
+    const dir = await newMap();
+    const soft: AiOutput = { ...seed, message: "先从三个变量开始，$a 是核心，你觉得呢？" };
+    const provider = new FakeProvider([{ output: soft }]);
+    const r = await takeTurn(dir, provider, { ...opts, userText: "拖延" });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.attempts).toHaveLength(1);
+    expect(r.warnings.map((w) => w.code)).toEqual(["question_in_message", "internal_id"]);
+    expect(r.output.message).toBe("先从三个变量开始，「焦虑程度」是核心，你觉得呢？");
+    expect((await readPatch(dir, "p001")).message).toBe(r.output.message);
+    expect((await readConversation(dir)).items[1]?.text).toBe(r.output.message);
+  });
+
+  it("JSON 格式不合法（schema_failure）属于硬性违规：带着校验错误重试一次", async () => {
+    const dir = await newMap();
+    const provider = new FakeProvider([{ error: { kind: "schema_failure", message: "缺少 kind" } }, { output: seed }]);
+    const r = await takeTurn(dir, provider, { ...opts, userText: "拖延" });
+    expect(r.ok).toBe(true);
+    expect(r.attempts.map((a) => a.error?.kind ?? "ok")).toEqual(["schema_failure", "ok"]);
+    expect(provider.requests[1]?.prompt).toContain("不要包在其他字段里");
   });
 
   it("额度用尽：不重试，用户消息保留；之后不传 userText 即可重试", async () => {
@@ -139,6 +163,27 @@ describe("classify（CLI 结果分类）", () => {
     expect(run({ is_error: true, result: "Claude usage limit reached" })?.kind).toBe("rate_limit");
     expect(run({ is_error: true, result: "Not logged in · Please run /login" })?.kind).toBe("auth");
   });
+  it("stream-json：多次不符合格式时带出校验错误，并记下 AI 提交的参数", () => {
+    const lines = [
+      { type: "system", subtype: "init" },
+      { type: "assistant", message: { content: [{ type: "tool_use", name: "StructuredOutput", input: { output: { kind: "patch" } } }] } },
+      { type: "user", message: { content: [{ type: "tool_result", is_error: true, content: "root: must have required property 'kind'" }] } },
+      { type: "result", subtype: "error_max_structured_output_retries", is_error: true },
+    ];
+    const stdout = lines.map((l) => JSON.stringify(l)).join("\n");
+    const c = run(stdout);
+    expect(c?.kind).toBe("schema_failure");
+    expect(c?.message).toContain("must have required property 'kind'");
+    const p = parseStream(stdout);
+    expect(p.structuredAttempts).toEqual(['{"output":{"kind":"patch"}}']);
+    expect(p.result?.subtype).toBe("error_max_structured_output_retries");
+  });
+
+  it("stream-json：成功时从 result 行取结构化输出", () => {
+    const stdout = [{ type: "system" }, { type: "result", subtype: "success", is_error: false, structured_output: { a: 1 } }].map((l) => JSON.stringify(l)).join("\n");
+    expect(run(stdout)).toBeNull();
+  });
+
   it("没有结构化输出、不是 JSON", () => {
     expect(run({ is_error: false, result: "我不能回答" })?.kind).toBe("no_output");
     expect(run("Error: boom", { exitCode: 1 })?.kind).toBe("cli_error");

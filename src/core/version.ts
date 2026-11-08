@@ -1,13 +1,13 @@
 // 版本管理：快照、差异、恢复（设计文档第 6 节第 7 条、第 7.5 节）。
 import { firstSeqId, nextSeqId } from "./ids";
-import { SCHEMA_VERSION, type Frame, type Graph, type OpDecision, type Version } from "./schema";
+import { SCHEMA_VERSION, UNSPECIFIED_CONTEXT, type Frame, type Graph, type OpDecision, type Version } from "./schema";
 
 /** 创建 Map 时的空图 v000 */
 export function initialVersion(topic: string, now: string): Version {
   const graph: Graph = {
     schema_version: SCHEMA_VERSION,
     version: firstSeqId("v"),
-    frame: { topic, phenomenon: "", perspective: "", time_horizon: "" },
+    frame: { topic, phenomenon: "", perspective: "", time_horizon: "", context: UNSPECIFIED_CONTEXT },
     nodes: [],
     edges: [],
   };
