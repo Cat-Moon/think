@@ -7,7 +7,7 @@ import { previewPatch } from "../core/preview";
 import type { PatchOp, WorkspaceConfig } from "../core/schema";
 import type { MapState } from "../server/api";
 import { api, streamTurn } from "./client";
-import { ChatInput, ChatLog, type Busy } from "./Chat";
+import { ChatInput, ChatLog, type Busy, type TurnFailure } from "./Chat";
 import { GraphView, type Positions, type Selection } from "./GraphView";
 import { freeSpotNear, nodeBoxes, nodeWidth } from "./layout";
 import { LoopPanel, PatchPanel, SelectionPanel } from "./Panels";
@@ -53,7 +53,9 @@ export function MapView(props: { name: string; config: WorkspaceConfig; onBack: 
   const [tab, setTab] = useState<Tab>("chat");
   const [draft, setDraftState] = useState(() => loadDraft(name));
   const [busy, setBusy] = useState<Busy | null>(null);
-  const [turnError, setTurnError] = useState<string | null>(null);
+  const [turnError, setTurnError] = useState<TurnFailure | null>(null);
+  /** 连线：选好起点和终点后，选择极性（+ / − / ?）再新增，只产生一个版本 */
+  const [newEdge, setNewEdge] = useState<{ from: string; to: string; rendered: { x: number; y: number } } | null>(null);
   const [working, setWorking] = useState(false);
   const [legendOpen, setLegendOpen] = useState(() => {
     try {
@@ -90,6 +92,8 @@ export function MapView(props: { name: string; config: WorkspaceConfig; onBack: 
         setState(s);
         setPositionsState(s.layout.positions);
         if (s.repairs.length) setNotice(`打开时自动修复：${s.repairs.join("；")}`);
+        // 新建的 Map：把主题预填进输入框
+        if (s.turns.length === 0 && !loadDraft(name)) setDraft(s.meta.title);
       },
       (e: Error) => setLoadError(e.message),
     );
@@ -140,11 +144,20 @@ export function MapView(props: { name: string; config: WorkspaceConfig; onBack: 
     }
   };
 
-  const connect = async (from: string, to: string) => {
+  const connect = async (from: string, to: string, polarity: "+" | "-" | "?") => {
+    setNewEdge(null);
     const before = new Set(graph?.edges.map((e) => e.id));
-    const s = await edit([{ op: "add_edge", from, to, polarity: "?", rationale: "" }]);
+    const s = await edit([{ op: "add_edge", from, to, polarity, rationale: "" }]);
     const added = s?.versions.at(-1)!.graph.edges.find((e) => !before.has(e.id));
-    if (added) setSelection({ kind: "edge", id: added.id }); // 极性默认"?"，在右侧可以改
+    if (added) setSelection({ kind: "edge", id: added.id });
+  };
+
+  /** 放弃对话末尾没有回复的消息：放回输入框，可以改写后重发 */
+  const abandon = async () => {
+    const last = state?.turns.at(-1);
+    const s = await run(() => api.abandon(name));
+    if (s && last?.role === "user" && !draft.trim()) setDraft(last.text);
+    setTurnError(null);
   };
 
   const sendTurn = async (text: string | undefined) => {
@@ -177,11 +190,23 @@ export function MapView(props: { name: string; config: WorkspaceConfig; onBack: 
     if (!done.ok) {
       // 消息没有保存（例如有待处理的建议）：放回输入框，不丢
       if (text !== undefined && !(saved && last?.text === text) && !draft) setDraft(text);
-      setTurnError(`${done.error.message}${done.ok === false && done.violations?.length ? `：${done.violations.join("；")}` : ""}`);
+      setTurnError({ ...done.error, violations: done.violations });
     }
   };
 
   const cancel = () => abort.current?.abort();
+
+  // 选中的变量或关系从画面里消失（被去掉、被拒绝、切换版本）时，关闭详情卡片
+  const visibleGraph = preview?.after ?? graph;
+  useEffect(() => {
+    if (!selection || !visibleGraph) return;
+    const shownNode = (id: string) => visibleGraph.nodes.some((n) => n.id === id && (n.status !== "rejected" || showRejected));
+    const ok =
+      selection.kind === "node"
+        ? shownNode(selection.id)
+        : visibleGraph.edges.some((e) => e.id === selection.id && (e.status !== "rejected" || showRejected) && shownNode(e.from) && shownNode(e.to));
+    if (!ok) setSelection(null);
+  }, [visibleGraph, selection, showRejected]);
 
   if (loadError)
     return (
@@ -194,7 +219,13 @@ export function MapView(props: { name: string; config: WorkspaceConfig; onBack: 
 
   const lastTurn = state.turns.at(-1);
   const canRetry = !busy && lastTurn?.role === "user";
-  const inputDisabled = readOnly ? "正在查看旧版本。回到当前版本后才能继续对话。" : pending ? "先处理上面 AI 的建议（接受或拒绝），再继续对话。" : canRetry ? "上一条消息还没有 AI 回复，可以先重试。" : null;
+  const inputDisabled = readOnly
+    ? "正在查看旧版本。回到当前版本后才能继续对话。"
+    : pending
+      ? "先处理上面 AI 的建议（接受或拒绝），再继续对话。"
+      : canRetry
+        ? "上一条消息还没有 AI 回复：可以重试，或放弃它后改写重发。"
+        : null;
 
   return (
     <div className="app">
@@ -246,10 +277,25 @@ export function MapView(props: { name: string; config: WorkspaceConfig; onBack: 
           onToggleAllLoops={() => setShowAllLoops((v) => !v)}
           readOnly={readOnly}
           connectMode={connectMode && !pending}
-          onConnect={(a, b) => void connect(a, b)}
+          onConnect={(from, to, rendered) => setNewEdge({ from, to, rendered })}
           onCanvasDblClick={pending || readOnly ? undefined : (model, rendered) => setNewNode({ model, rendered, label: "" })}
           onRelayout={() => onPositions({})}
         >
+          {newEdge && (
+            <div className="new-edge" style={{ left: newEdge.rendered.x, top: newEdge.rendered.y }}>
+              <span className="meta">新关系的极性：</span>
+              <button className="pol pol-pos" onClick={() => void connect(newEdge.from, newEdge.to, "+")} title="同向">
+                +
+              </button>
+              <button className="pol pol-neg" onClick={() => void connect(newEdge.from, newEdge.to, "-")} title="反向">
+                −
+              </button>
+              <button className="pol pol-unk" onClick={() => void connect(newEdge.from, newEdge.to, "?")} title="还不确定方向">
+                ?
+              </button>
+              <button onClick={() => setNewEdge(null)}>取消</button>
+            </div>
+          )}
           {newNode && (
             <div className="new-node" style={{ left: newNode.rendered.x, top: newNode.rendered.y }}>
               <input
@@ -325,7 +371,7 @@ export function MapView(props: { name: string; config: WorkspaceConfig; onBack: 
               </p>
             )}
             {tab === "chat" && (
-              <ChatLog turns={state.turns} patches={state.patches} busy={busy} error={turnError} canRetry={canRetry && !readOnly} onRetry={() => void sendTurn(undefined)} onCancel={cancel}>
+              <ChatLog turns={state.turns} patches={state.patches} busy={busy} error={turnError} canRetry={canRetry && !readOnly} onRetry={() => void sendTurn(undefined)} onAbandon={() => void abandon()} onCancel={cancel} hideTurn={pending?.turn_id}>
                 {pending && preview && (
                   <PatchPanel
                     key={pending.patch_id}

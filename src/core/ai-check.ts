@@ -24,6 +24,9 @@ export type ViolationCode =
   | "contested_unjustified" // 标了有争议但理由中没写争议所在
   | "long_rationale" // 理由超过 2 句
   | "unverified_citation" // 引用具体研究者或文献，但没有标注"AI 记忆，未核实"
+  | "unnamed_authority" // "一些研究发现""学界认为"等未点名的说法，没有标注"AI 记忆，未核实"
+  | "user_third_person" // 用第三人称称呼用户（"用户描述的……"），应一律用"你"
+  | "menu_question" // 种子图的问题是菜单式的（"你最想深入哪个方向——A、B 还是 C"）
   | "region_assumed" // 地区未指定，但文字中出现了具体国家或地区制度
   | "internal_id" // 显示文字里出现内部 ID（已自动替换）
   | "ui_detail" // 提到界面细节（颜色、按钮等）
@@ -43,12 +46,18 @@ export const isHardViolation = (code: ViolationCode) => ERROR_CODES.has(code);
 
 /** 回路相关的具体说法（AI 不应自己判断或预告回路；单独的"增强""反馈"是普通用词，不算） */
 export const LOOP_PHRASES =
-  /回路|增强环|平衡环|正反馈|负反馈|反馈环|反馈机制|恶性循环|良性循环|循环往复|形成.{0,6}循环|闭环|闭合|自我强化|自我加强|自我放大|螺旋上升|新的结构|新结构|feedback loop|reinforcing|balancing loop|vicious (circle|cycle)|virtuous (circle|cycle)|\bloops?\b/i;
+  /回路|增强环|平衡环|正反馈|负反馈|反馈环|反馈机制|恶性循环|良性循环|循环往复|形成.{0,6}循环|闭环|闭合|自我强化|自我加强|自我放大|相互放大|互相放大|彼此放大|相互强化|互相强化|彼此强化|螺旋上升|新的结构|新结构|feedback loop|reinforcing|balancing loop|vicious (circle|cycle)|virtuous (circle|cycle)|\bloops?\b/i;
 /** 标了 contested 时，理由中应体现争议所在 */
 const CONTESTED_EXPLAINED = /争议|分歧|观点|看法|立场|一方|另一方|有人认为|也有人|另一些|另有|一些研究|有研究|批评|支持者|反对者|学界|debat|disput|contest/i;
 /** 引用具体研究者、文献或年份 */
 const CITATION = /[A-Z][a-zA-Z'-]+(\s(and|&)\s[A-Z][a-zA-Z'-]+)?\s*(等人|et al|的(研究|理论|实验|论文)|（\d{4}）|\(\d{4}\))|《[^》]{2,}》|\b(19|20)\d{2}\s*年的?(研究|论文|实验|调查)/;
 export const CITATION_MARK = "AI 记忆，未核实";
+/** 未点名的权威说法：应标注 CITATION_MARK，或改成"可能" */
+export const UNNAMED_AUTHORITY = /(一些|有些|有|多项|不少|大量|许多|很多)?(研究|调查|实验|数据)(发现|表明|显示|指出|证明|认为)|学界(认为|普遍|共识|发现)|学者(们)?(认为|指出|发现)|研究者(们)?(认为|指出|发现)|专家(们)?(认为|指出)/;
+/** 第三人称称呼用户（"用户描述的……"）；"社交媒体用户"等普通用法不算 */
+export const USER_THIRD_PERSON = /用户(描述|说|提到|认为|觉得|表示|反馈|自己|刚才|之前|的(描述|情况|感受|经历|回答|说法|问题|想法))/;
+/** 菜单式问题：让用户在几个方向里挑一个，而不是问机制、亲身经验、缺失的变量或延迟 */
+export const MENU_QUESTION = /哪(个|一个|条|一条|种|一种)?.{0,12}(方向|线索|角度|路径)|(最想|想先|更想|最感兴趣|更感兴趣|优先).{0,8}(深入|探索|展开|了解|研究|看)/;
 /** 地区未指定时不应出现的国家、地区或地区特有的制度 */
 const REGION_WORDS =
   /中国|美国|日本|英国|德国|法国|韩国|印度|俄罗斯|欧洲|欧盟|北美|拉美|北京|上海|深圳|广州|香港|台湾|新加坡|加拿大|澳大利亚|共和党|民主党|国会|特朗普|拜登|户籍|户口|限购|公积金|土地财政|学区房|一线城市|二线城市|高考|内卷|America|China|Japan|Europe|Republican|Democrat|Congress/;
@@ -77,7 +86,8 @@ export function assertsCause(text: string, from: string, to: string): string | n
   return null;
 }
 
-const countQuestions = (s: string) => (s.match(/[?？]/g) ?? []).length;
+/** 问号个数；引号或括号里单独的 ? / ？（极性符号，如"标为？"）不算 */
+const countQuestions = (s: string) => (s.replace(/["“「『（(]\s*[?？]\s*["”」』）)]/g, "").match(/[?？]/g) ?? []).length;
 const sentenceCount = (s: string) => s.split(/[。！？!?；;]+/).filter((x) => x.trim().length > 1).length;
 
 /** AI 输出中所有给用户看的文字：[位置, 文字] */
@@ -107,6 +117,8 @@ export function checkAiOutput(out: AiOutput, graph: Graph, patches: readonly Pat
   if (q > 1) push("multiple_questions", `question 中有 ${q} 个问号，只能问一个问题`);
   if (countQuestions(out.message) > 0) push("question_in_message", "message 中夹带了问题，问题应只放在 question 里");
   if (out.kind !== "answer" && !out.question.trim()) push("missing_question", "clarify 和 patch 应附一个问题");
+  const menu = isSeedTurn(graph) && out.kind === "patch" ? out.question.match(MENU_QUESTION) : null;
+  if (menu) push("menu_question", `种子图的问题是菜单式的（"${menu[0]}"）：应问机制、亲身经验、缺失的变量或延迟`);
 
   // 文字：回路、引用、地区、内部 ID、界面细节
   const regionOpen = isContextUnspecified(graph.frame.context) && !out.ops.some((o) => o.op === "set_frame" && !isContextUnspecified(o.context));
@@ -115,6 +127,10 @@ export function checkAiOutput(out: AiOutput, graph: Graph, patches: readonly Pat
     if (loop) push("loop_language", `${where}中出现了"${loop[0]}"：回路由程序检测，不要判断或预告`);
     const cite = text.match(CITATION);
     if (cite && !text.includes(CITATION_MARK)) push("unverified_citation", `${where}引用了"${cite[0]}"，但没有标注"${CITATION_MARK}"`);
+    const unnamed = cite ? null : text.match(UNNAMED_AUTHORITY);
+    if (unnamed && !text.includes(CITATION_MARK)) push("unnamed_authority", `${where}中的"${unnamed[0]}"没有点名出处，应标注"${CITATION_MARK}"或改成"可能"`);
+    const third = text.match(USER_THIRD_PERSON);
+    if (third) push("user_third_person", `${where}中用"${third[0]}"称呼用户，应直接用"你"`);
     const region = regionOpen ? text.match(REGION_WORDS) : null;
     if (region) push("region_assumed", `地区/语境未指定，但${where}中出现了"${region[0]}"`);
     const id = text.match(INTERNAL_ID);

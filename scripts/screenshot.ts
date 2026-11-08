@@ -132,11 +132,13 @@ await page.waitForTimeout(200);
 await shot("m5-settings");
 
 // 小窗口：图例完整可见；折叠后
-await page.setViewportSize({ width: 1100, height: 640 });
+await page.setViewportSize({ width: 900, height: 560 });
 await page.goto(mapUrl("11"));
 await page.waitForSelector(".graph canvas");
 await page.waitForTimeout(900);
 await shot("m5-small-window-legend");
+const zoom = await page.evaluate(() => (window as unknown as { __cy: import("cytoscape").Core }).__cy.zoom());
+console.log(`  小窗口：缩放 ${zoom.toFixed(2)}，变量名 ${(14 * zoom).toFixed(1)}px（应不小于 12px）`);
 const box = await page.locator(".legend").boundingBox();
 const vp = page.viewportSize()!;
 console.log(`  图例：${box ? `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}×${Math.round(box.height)}，${box.y + box.height <= vp.height && box.x + box.width <= vp.width ? "完整可见" : "超出窗口"}` : "未找到"}`);

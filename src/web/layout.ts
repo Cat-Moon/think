@@ -53,6 +53,29 @@ export function boxGap(a: Box, b: Box): number {
   return Math.max(dx, dy);
 }
 
+/** 外框之间至少留出的间隙：小于它就算重叠（几乎贴在一起也算） */
+export const MIN_BOX_GAP = 8;
+
+/**
+ * 已保存的位置中外框重叠的变量（旧的 layout.json、改名后变宽、恢复版本带回的变量等）：
+ * 按编号从小到大保留位置，与已保留的变量重叠的（较新的那个）放开，让布局重新给它找位置。
+ * 其余变量不动。
+ */
+export function releaseOverlapping(nodes: { id: string; label: string }[], saved: Positions): Positions {
+  const num = (id: string) => Number(id.replace(/\D/g, "")) || 0;
+  const keep: Positions = {};
+  const kept: Box[] = [];
+  for (const n of nodes.filter((x) => saved[x.id]).sort((a, b) => num(a.id) - num(b.id))) {
+    const p = saved[n.id]!;
+    const box = { x: p.x, y: p.y, w: nodeWidth(n.label), h: NODE_H };
+    if (kept.every((b) => boxGap(box, b) >= MIN_BOX_GAP)) {
+      keep[n.id] = p;
+      kept.push(box);
+    }
+  }
+  return keep;
+}
+
 /**
  * 用户双击的位置：离已有变量太近（间隙小于 gap）时，就近向外找一个空位，避免新变量压在已有变量上。
  * 已有变量不动。
@@ -96,8 +119,9 @@ function withSeededRandom<T>(seed: number, fn: () => T): T {
  * 计算布局：fixed 中已有位置的节点不动，只给其余节点找位置。
  * 返回所有参与布局的节点的位置（含 fixed 中的）。
  */
-export function computeLayout(graph: Graph, fixed: Positions = {}, showRejected = false): Positions {
+export function computeLayout(graph: Graph, savedPositions: Positions = {}, showRejected = false): Positions {
   const nodes = layoutNodes(graph, showRejected);
+  const fixed = releaseOverlapping(nodes, savedPositions);
   const ids = new Set(nodes.map((n) => n.id));
   const missing = nodes.filter((n) => !fixed[n.id]);
   const result: Positions = {};

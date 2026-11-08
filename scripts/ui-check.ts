@@ -56,6 +56,7 @@ await page.fill(".home input", "为什么我总是拖延");
 await page.click(".home button.primary");
 await page.waitForSelector(".chat-input textarea");
 check(page.url().includes("?map="), "新建后打开这个 Map");
+check((await page.inputValue(".chat-input textarea")) === "为什么我总是拖延", "主题预填进输入框");
 
 // 对话：思考中（流式进度）
 await page.fill(".chat-input textarea", "为什么我总是拖延");
@@ -68,6 +69,9 @@ await shot("thinking");
 await page.waitForSelector(".card.patch", { timeout: 15000 });
 await page.waitForTimeout(800);
 await shot("patch");
+const btn = await page.locator(".patch-footer button.primary").boundingBox();
+check(Boolean(btn && btn.y + btn.height <= 950), "接受按钮固定在可见区域底部");
+check((await page.textContent(".card.patch"))?.includes("你拖延的时候，更常见的感受") ?? false, "AI 的问题显示在建议卡片里");
 
 // 逐项处理：拒绝"任务难度 → 焦虑程度"，写理由
 await page.uncheck(".op >> nth=5 >> input[type=checkbox]");
@@ -91,20 +95,20 @@ check(sleep?.origin === "user" && p2.origin === "user" && p2.resolution?.result_
 check(Boolean(json(join(mapDir(), "layout.json")).positions[sleep?.id]), "新变量的位置写入 layout.json");
 const before = json(join(mapDir(), "layout.json")).positions;
 
-// 连线模式：睡眠质量 → 焦虑程度，极性默认 ?，之后改成 −
+// 连线模式：睡眠质量 → 焦虑程度，连好后直接选极性（只产生一个版本）
 await page.click("header >> text=连线");
 let a = await nodeAt(page, "睡眠质量");
 await page.mouse.click(a.x, a.y);
 a = await nodeAt(page, "焦虑程度");
 await page.mouse.click(a.x, a.y);
-await page.waitForSelector("text=极性定为 −");
+await page.waitForSelector(".new-edge");
 await shot("connect");
+await page.click(".new-edge >> text=−");
+await page.waitForSelector("text=极性相反");
 const v3 = json(join(mapDir(), "versions", "v003.json"));
 const newEdge = v3.graph.edges.find((e: { from: string }) => e.from === sleep.id);
-check(newEdge?.polarity === "?" && newEdge?.origin === "user", "连线新增关系，极性默认 ?");
-await page.click("text=极性定为 −");
-await page.waitForTimeout(500);
-check(json(join(mapDir(), "versions", "v004.json")).graph.edges.find((e: { id: string }) => e.id === newEdge.id)?.polarity === "-", "之后可以改极性");
+check(newEdge?.polarity === "-" && newEdge?.origin === "user", "连线时直接选极性 −");
+check(readdirSync(join(mapDir(), "versions")).length === 4, "连线只产生一个版本");
 await page.click("header >> text=退出连线");
 const after = json(join(mapDir(), "layout.json")).positions;
 check(
@@ -127,7 +131,7 @@ await page.fill(".card .reason input", "暂时不考虑");
 await page.click("text=确认删除");
 await page.waitForTimeout(500);
 check(!(await labels()).includes("任务难度"), "删除变量（图上不再显示）");
-const lastPatch = json(join(mapDir(), "patches", "p006.json"));
+const lastPatch = json(join(mapDir(), "patches", "p005.json"));
 check(lastPatch.origin === "user" && lastPatch.ops[0].op === "remove_node" && lastPatch.ops[0].reason === "暂时不考虑", "删除走补丁（remove_node，带理由）");
 
 // 取消：消息已保存，可以重试
@@ -153,6 +157,12 @@ await page.waitForSelector(".msg.error");
 await shot("error");
 check((await page.textContent(".msg.error"))?.includes("额度") ?? false, "失败时显示原因");
 check(await page.isVisible(".msg.error >> text=重试"), "失败后可以重试，输入不丢");
+check((await page.textContent(".msg.error"))?.includes("重置") ?? false, "额度用完时显示重置时间");
+await page.click(".msg.error >> text=放弃这条消息");
+await page.waitForSelector(".msg.user.abandoned");
+check((await page.inputValue(".chat-input textarea")) === "还有什么遗漏？", "放弃后消息放回输入框，可以改写重发");
+check(!(await page.isVisible(".msg.error")), "放弃后不再卡在重试");
+await shot("abandoned");
 
 // 版本：回看 v001（只读），恢复（产生新版本）
 await page.click(".tabs >> text=版本与笔记");
@@ -163,7 +173,7 @@ await page.click("text=确认恢复");
 await page.waitForTimeout(800);
 const versions = readdirSync(join(mapDir(), "versions")).sort();
 const restored = json(join(mapDir(), "versions", versions.at(-1)!));
-check(restored.restored_from === "v001" && versions.length === 8, `恢复产生新版本 ${restored.version}（历史共 ${versions.length} 个版本）`);
+check(restored.restored_from === "v001" && versions.length === 7, `恢复产生新版本 ${restored.version}（历史共 ${versions.length} 个版本）`);
 await page.fill(".notes textarea", "先观察一周");
 await page.waitForTimeout(1500);
 check(readFileSync(join(mapDir(), "notes.md"), "utf8") === "先观察一周", "笔记自动保存");

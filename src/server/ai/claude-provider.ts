@@ -123,7 +123,12 @@ export class ClaudeCodeProvider implements AgentProvider {
     const raw = parsed.result
       ? { ...parsed.result, structured_output_errors: parsed.structuredErrors, structured_output_attempts: parsed.structuredAttempts, rate_limit_event: parsed.rateLimit }
       : { stdout: run.stdout.slice(0, 2000), stderr: run.stderr.slice(0, 2000) };
-    if (error) return { ok: false, error, durationMs, raw };
+    if (error) {
+      // 额度用完时，CLI 的 rate_limit_event 带有重置时间（秒）
+      const resets = (parsed.rateLimit as { rate_limit_info?: { resetsAt?: unknown } } | null)?.rate_limit_info?.resetsAt;
+      if (error.kind === "rate_limit" && typeof resets === "number") return { ok: false, error: { ...error, resetsAt: new Date(resets * 1000).toISOString() }, durationMs, raw };
+      return { ok: false, error, durationMs, raw };
+    }
     const json = parsed.result!;
     return { ok: true, output: json.structured_output, usage: json.usage ? parseUsage(json.usage) : ZERO_USAGE, durationMs, raw };
   }

@@ -39,7 +39,7 @@ export type LLMErrorKind =
 
 export type LLMResponse =
   | { ok: true; output: unknown; usage: Usage; durationMs: number; raw: unknown }
-  | { ok: false; error: { kind: LLMErrorKind; message: string }; durationMs: number; raw?: unknown };
+  | { ok: false; error: { kind: LLMErrorKind; message: string; /** 额度用完时：CLI 给出的重置时间（ISO） */ resetsAt?: string }; durationMs: number; raw?: unknown };
 
 export interface ProviderStatus {
   ok: boolean;

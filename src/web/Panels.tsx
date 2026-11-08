@@ -202,7 +202,10 @@ export function PatchPanel(props: {
   return (
     <div className="card patch">
       <h3>AI 的建议</h3>
-      <p className="hint">取消勾选表示拒绝这一项，可以写一句理由（可不填）。</p>
+      {/* AI 的说明和问题放在最上面（对话里不再重复），列表再长也能先看到 */}
+      {patch.message && <p>{patch.message}</p>}
+      {patch.question && <p className="question">{patch.question}</p>}
+      <p className="hint">取消勾选表示拒绝这一项，可以写一句理由（可不填）。处理完再回答上面的问题。</p>
       <ul className="ops">
         {preview.ops.map((o) => {
           const off = accepted[o.index] === false;
@@ -233,6 +236,8 @@ export function PatchPanel(props: {
           接受后程序会检测到新的回路：{newLoops.map((l) => `${l.polarity === "?" ? "?" : l.polarity}（${[...l.nodes, l.nodes[0]!].map(label).join(" → ")}）`).join("；")}
         </p>
       )}
+      {/* 接受 / 拒绝按钮固定在底部：列表很长时也不用滚动到最后 */}
+      <div className="patch-footer">
       {rejectAll === null ? (
         <div className="actions">
           <button className="primary" disabled={props.busy || Boolean(applyError) || n === 0} onClick={() => props.onResolve(choices)}>
@@ -255,6 +260,7 @@ export function PatchPanel(props: {
           <button onClick={() => setRejectAll(null)}>取消</button>
         </div>
       )}
+      </div>
     </div>
   );
 }

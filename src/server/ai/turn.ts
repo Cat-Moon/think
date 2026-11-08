@@ -60,7 +60,7 @@ export type TurnResult =
     })
   | (TurnBase & {
       ok: false;
-      error: { kind: LLMErrorKind | "invalid_output"; message: string };
+      error: { kind: LLMErrorKind | "invalid_output"; message: string; resetsAt?: string };
       /** invalid_output 时：最后一次的输出和没通过的检查，展示给用户，不静默截断 */
       output?: AiOutput;
       violations?: Violation[];

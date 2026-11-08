@@ -3,8 +3,10 @@ import { findLoops } from "../core/loops";
 import { applyOps } from "../core/patch";
 import { Graph as GraphSchema, type Graph, type PatchOp } from "../core/schema";
 import { current, demoState, resolvePending } from "./demo";
+import { previewPatch } from "../core/preview";
+import { restoreVersion } from "../core/version";
 import fixtures from "./fixtures/real-graphs.json";
-import { MARKER_R, NODE_GAP, NODE_H, boxGap, computeLayout, freeSpotNear, nodeBoxes, nodeWidth, placeLoopMarkers, segmentDistance, type Positions } from "./layout";
+import { MARKER_R, NODE_GAP, NODE_H, boxGap, computeLayout, freeSpotNear, MIN_BOX_GAP, nodeBoxes, nodeWidth, placeLoopMarkers, segmentDistance, type Positions } from "./layout";
 import { arrange, edgePath, routeEdges, routeInputs } from "./routing";
 
 /** 路由之后的问题，写成可读的文字 */
@@ -146,5 +148,78 @@ describe("双击新增变量的位置", () => {
     const p = freeSpotNear({ x: 40, y: 2 }, w, boxes);
     for (const b of boxes.values()) expect(boxGap({ ...p, w, h: NODE_H }, b)).toBeGreaterThanOrEqual(NODE_GAP / 2);
     expect(Math.hypot(p.x - 40, p.y - 2)).toBeLessThan(200);
+  });
+});
+
+describe("任意操作后变量外框两两不重叠", () => {
+  /** 显示的位置：与界面一致，用 arrange 计算 */
+  const shown = (g: Graph, saved: Positions) => arrange(g, saved).positions;
+  function expectSeparate(g: Graph, pos: Positions, name: string) {
+    const boxes = [...nodeBoxes(g, pos).entries()];
+    expect(boxes.length, `${name}：每个变量都有位置`).toBe(g.nodes.filter((n) => n.status === "accepted").length);
+    for (let i = 0; i < boxes.length; i++)
+      for (let j = i + 1; j < boxes.length; j++) {
+        const gap = boxGap(boxes[i]![1], boxes[j]![1]);
+        expect(gap, `${name}：${boxes[i]![0]} 和 ${boxes[j]![0]} 的间隙 ${gap.toFixed(1)}`).toBeGreaterThanOrEqual(MIN_BOX_GAP);
+      }
+  }
+  const user = (g: Graph, op: PatchOp) => {
+    const v = { ...applyOps(g, [{ index: 0, op }], "user"), version: g.version };
+    return v;
+  };
+  const base = () => current(resolvePending(demoState(), "all"));
+
+  it("双击新增：双击在已有变量上，新变量就近找空位", () => {
+    const g = base();
+    const pos = shown(g, {});
+    const label = "城市边缘的住宅开发";
+    const spot = freeSpotNear(pos.n1!, nodeWidth(label), nodeBoxes(g, pos));
+    const after = user(g, { op: "add_node", ref: "$x", label });
+    const id = after.nodes.at(-1)!.id;
+    expectSeparate(after, shown(after, { ...pos, [id]: spot }), "双击新增");
+  });
+
+  it("接受 AI 建议后新增变量（全部接受、部分接受）", () => {
+    const s = demoState();
+    const g = current(s);
+    const pos = shown(g, {});
+    const pre = shown(previewPatch(g, s.pending!, s.patches).after!, pos); // 预览时给新变量的位置
+    expectSeparate(current(resolvePending(s, "all")), shown(current(resolvePending(s, "all")), pre), "全部接受");
+    const partial = current(resolvePending(s, { 0: { decision: "accepted" }, 1: { decision: "rejected" }, 2: { decision: "accepted" }, 3: { decision: "accepted" } }));
+    expectSeparate(partial, shown(partial, pre), "部分接受");
+  });
+
+  it("改名后变宽", () => {
+    for (const c of cases.slice(0, 6)) {
+      const pos = shown(c.graph, {});
+      const target = c.graph.nodes.find((n) => n.status === "accepted")!;
+      const after = user(c.graph, { op: "update_node", id: target.id, label: "一个改得非常非常长的变量名称用来测试" });
+      expectSeparate(after, shown(after, pos), `${c.name} 改名`);
+    }
+  });
+
+  it("恢复版本：被去掉期间别的变量被拖到它的位置，恢复后它回来", () => {
+    const g = base();
+    const pos = shown(g, {});
+    const removed = user(g, { op: "remove_node", id: "n1" });
+    const dragged = { ...pos, n2: { ...pos.n1! } }; // n1 隐藏时，把 n2 拖到 n1 原来的位置
+    const restored = restoreVersion({ ...removed, version: "v009" }, g, "2026-11-09T00:00:00.000Z").graph;
+    expectSeparate(restored, shown(restored, dragged), "恢复版本");
+  });
+
+  it("读取旧的 layout.json：保存的位置本身就重叠", () => {
+    for (const c of cases.slice(0, 6)) {
+      const pos = shown(c.graph, {});
+      const ids = Object.keys(pos);
+      const old = { ...pos, [ids[1]!]: { x: pos[ids[0]!]!.x + 12, y: pos[ids[0]!]!.y + 8 } }; // 偏移十几像素，几乎完全重叠
+      expectSeparate(c.graph, shown(c.graph, old), `${c.name} 旧布局`);
+      // 不重叠的变量位置不变
+      const moved = Object.keys(pos).filter((id) => id !== ids[1] && JSON.stringify(shown(c.graph, old)[id]) !== JSON.stringify(old[id]));
+      expect(moved, `${c.name}：只移动重叠的那个`).toEqual([]);
+    }
+  });
+
+  it("重新布局（清空位置）能把重叠的变量分开", () => {
+    for (const c of cases) expectSeparate(c.graph, shown(c.graph, {}), `${c.name} 重新布局`);
   });
 });

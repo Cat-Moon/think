@@ -79,7 +79,7 @@ export type TurnStreamEvent =
   | {
       type: "done";
       ok: false;
-      error: { kind: string; message: string };
+      error: { kind: string; message: string; /** 额度用完时的重置时间（ISO），CLI 给了才有 */ resetsAt?: string };
       /** 用户消息是否已保存（已保存则可以直接重试，不用重新输入） */
       saved: boolean;
       /** 没有通过检查时：未通过的检查 */

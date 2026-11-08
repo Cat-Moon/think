@@ -258,6 +258,8 @@ export const Turn = z.object({
   question: z.string().optional(),
   patch_id: PatchId.optional(),
   version: VersionId.optional(),
+  /** system 回合：用户放弃了这条没有得到回复的消息（对话只追加，用这一条标记；不发给 AI） */
+  abandoned_turn: TurnId.optional(),
   created_at: z.iso.datetime(),
 });
 

@@ -156,3 +156,28 @@ describe("HTTP API", () => {
     expect((await call("GET", "/api/maps/nope")).status).toBe(404);
   });
 });
+
+describe("放弃没有回复的消息", () => {
+  it("放弃后不能重试、可以发新消息；被放弃的消息不发给 AI；额度用完时带上重置时间", async () => {
+    const resetsAt = "2026-11-09T05:30:00.000Z";
+    const { call, turn, provider } = await start([{ error: { kind: "rate_limit", message: "额度用完", resetsAt } }, { output: seed }]);
+    const { name } = (await call<{ name: string }>("POST", "/api/maps", { topic: "拖延" })).body;
+    expect((await turn(name, "这条会失败")).at(-1)).toMatchObject({ type: "done", ok: false, error: { kind: "rate_limit", resetsAt } });
+
+    expect((await call("POST", `/api/maps/${encodeURIComponent(name)}/abandon`)).status).toBe(200);
+    let s = (await call<MapState>("GET", `/api/maps/${encodeURIComponent(name)}`)).body;
+    expect(s.turns.map((t) => [t.role, t.abandoned_turn ?? null])).toEqual([
+      ["user", null],
+      ["system", "t001"],
+    ]);
+    expect((await turn(name)).at(-1)).toMatchObject({ ok: false, saved: false }); // 没有可以重试的消息
+    expect((await call("POST", `/api/maps/${encodeURIComponent(name)}/abandon`)).status).toBe(400); // 也没有可以放弃的
+
+    expect((await turn(name, "改写后的消息")).at(-1)).toMatchObject({ ok: true });
+    const prompt = provider.requests.at(-1)!.prompt;
+    expect(prompt).toContain("改写后的消息");
+    expect(prompt).not.toContain("这条会失败");
+    s = (await call<MapState>("GET", `/api/maps/${encodeURIComponent(name)}`)).body;
+    expect(s.turns.map((t) => t.role)).toEqual(["user", "system", "user", "ai"]);
+  });
+});

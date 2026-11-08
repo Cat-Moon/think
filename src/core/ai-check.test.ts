@@ -95,14 +95,15 @@ describe("软性违规（只记录）", () => {
   it("标了有争议却没写争议所在", () => {
     expect(codes({ ops: [edge("房价高抑制需求", { contested: true })] }, twoNodes())).toEqual(["warning:contested_unjustified"]);
     expect(codes({ ops: [edge("有人认为高价抑制需求，也有人认为反而刺激投资", { contested: true })] }, twoNodes())).toEqual([]);
-    expect(codes({ ops: [edge("一些研究认为不平等推动对立；另一些研究认为身份因素才是主因", { contested: true })] }, twoNodes())).toEqual([]);
+    expect(codes({ ops: [edge("一些研究认为不平等推动对立；另一些研究认为身份因素才是主因", { contested: true })] }, twoNodes())).toEqual(["warning:unnamed_authority"]); // 争议本身写明了，但"研究认为"没有点名出处
+    expect(codes({ ops: [edge("有观点认为不平等推动对立，也有观点认为身份因素才是主因", { contested: true })] }, twoNodes())).toEqual([]);
   });
 
   it("引用具体研究者或文献时要标注 AI 记忆，未核实", () => {
     expect(codes({ ops: [edge("Guess 等人的研究发现影响有限")] }, twoNodes())).toEqual(["warning:unverified_citation"]);
     expect(codes({ ops: [edge("见《思考，快与慢》")] }, twoNodes())).toEqual(["warning:unverified_citation"]);
     expect(codes({ ops: [edge("Guess 等人的研究发现影响有限（AI 记忆，未核实）")] }, twoNodes())).toEqual([]);
-    expect(codes({ ops: [edge("一些研究发现影响有限")] }, twoNodes())).toEqual([]);
+    expect(codes({ ops: [edge("一些研究发现影响有限")] }, twoNodes())).toEqual(["warning:unnamed_authority"]);
   });
 
   it("地区未指定时出现具体国家或地区制度；指定了地区则不报", () => {
@@ -235,5 +236,41 @@ describe("buildTurnPrompt", () => {
     expect(prompt).toContain("用户的新消息：为什么需求会推高房价");
     expect(prompt).not.toContain("用户：为什么需求会推高房价");
     expect(prompt).toContain("- 问题太多");
+  });
+});
+
+describe("M5 收尾新增的软性警告", () => {
+  it("相互放大、互相强化、彼此强化算回路说法", () => {
+    for (const m of ["焦虑和拖延之间可能形成一个相互放大的关系。", "两者互相强化。", "它们彼此强化。"]) {
+      expect(codes(answer(m), twoNodes()), m).toEqual(["warning:loop_language"]);
+    }
+  });
+
+  it("未点名的权威说法要标注或改成可能", () => {
+    expect(codes(answer("一些研究发现，选民会跟随精英。"), twoNodes())).toEqual(["warning:unnamed_authority"]);
+    expect(codes(answer("学界认为两者有关。"), twoNodes())).toEqual(["warning:unnamed_authority"]);
+    expect(codes(answer("一些研究发现，选民会跟随精英（AI 记忆，未核实）。"), twoNodes())).toEqual([]);
+    expect(codes(answer("选民可能会跟随精英。"), twoNodes())).toEqual([]);
+  });
+
+  it("称呼用户为第三人称；'社交媒体用户'等普通用法不算", () => {
+    expect(codes(answer("用户描述的反复准备，和完美主义有关。"), twoNodes())).toEqual(["warning:user_third_person"]);
+    expect(codes(answer("你提到的反复准备，和完美主义有关。"), twoNodes())).toEqual([]);
+    expect(codes(answer("社交媒体用户的注意力被分散。"), twoNodes())).toEqual([]);
+  });
+
+  it("种子图的菜单式问题", () => {
+    expect(codes({ ops: seedOps, question: "你最想深入探索哪个方向——信息环境、身份认同，还是精英策略？" }, empty())).toEqual(["warning:menu_question"]);
+    expect(codes({ ops: seedOps, question: "你觉得这三条线索里，哪一条最符合你想探索的方向？" }, empty())).toEqual(["warning:menu_question"]);
+    expect(codes({ ops: seedOps, question: "你观察到的情况里，需求上升通常比价格上涨先出现吗？" }, empty())).toEqual([]);
+    // 只检查种子图
+    expect(codes(answer("说明。"), twoNodes()).includes("warning:menu_question")).toBe(false);
+  });
+});
+
+describe("问号计数", () => {
+  it("引号里单独的 ？ 是极性符号，不算问题", () => {
+    expect(codes(answer('所以把这条关系的极性标为"？"、同时标记为有争议。'), twoNodes())).toEqual([]);
+    expect(codes(answer("这条关系成立吗？"), twoNodes())).toEqual(["warning:question_in_message"]);
   });
 });

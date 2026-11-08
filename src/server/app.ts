@@ -13,6 +13,7 @@ import { TurnError, takeTurn } from "./ai/turn";
 import type { EditRequest, HealthResponse, MapListResponse, MapState, StatusResponse, TurnStreamEvent } from "./api";
 import { StorageError } from "./storage/fsutil";
 import {
+  abandonLastMessage,
   commitPatch,
   listPatchIds,
   listVersionIds,
@@ -250,6 +251,12 @@ export function createApp(opts: AppOptions) {
         return r.version?.version ?? null;
       });
       return json(res, 200, { ok: true, version });
+    }
+
+    // 放弃对话末尾那条没有回复的消息（可改写后重发）
+    if (method === "POST" && sub === "/abandon") {
+      const t = await withLock(name, () => abandonLastMessage(dir, now()));
+      return json(res, 200, { ok: true, turn: t.turn_id });
     }
 
     // 恢复旧版本：生成一个新版本（历史只增不改）

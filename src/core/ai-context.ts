@@ -6,6 +6,12 @@ import { isContextUnspecified, type Graph, type Patch, type Turn } from "./schem
 import { normalizeLabel } from "./validate";
 
 export const RECENT_TURNS = 8;
+
+/** 去掉用户放弃的消息和标记它的 system 回合（它们不发给 AI） */
+export function withoutAbandoned<T extends { turn_id: string; abandoned_turn?: string }>(turns: readonly T[]): T[] {
+  const gone = new Set(turns.flatMap((t) => (t.abandoned_turn ? [t.abandoned_turn, t.turn_id] : [])));
+  return turns.filter((t) => !gone.has(t.turn_id));
+}
 export const MAX_NEW_ITEMS = 3;
 
 export interface TurnContext {
@@ -135,7 +141,7 @@ export function buildTurnPrompt(ctx: TurnContext): string {
     sections.push(`## 用户自上一轮以来的直接修改\n${lines.join("\n")}`);
   }
 
-  const history = turns.slice(0, -1).slice(-RECENT_TURNS);
+  const history = withoutAbandoned(turns.slice(0, -1)).slice(-RECENT_TURNS);
   if (history.length) {
     const lines = history.map((t) => {
       if (t.role === "user") return `用户：${t.text}`;

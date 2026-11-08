@@ -28,5 +28,5 @@
       "possible_duplicates": []
     }
   },
-  { "error": { "kind": "rate_limit", "message": "订阅额度已用完或请求过于频繁，请稍后再试" } }
+  { "error": { "kind": "rate_limit", "message": "订阅额度已用完或请求过于频繁，请稍后再试", "resetsAt": "2030-01-01T09:30:00.000Z" } }
 ]

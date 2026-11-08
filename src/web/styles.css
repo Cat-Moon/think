@@ -504,6 +504,23 @@ button.danger {
 .chat-input button {
   align-self: flex-end;
 }
+/* 建议卡片的按钮固定在可见区域底部 */
+.patch-footer {
+  position: sticky;
+  bottom: 0;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  margin: 0 -12px -10px;
+  padding: 8px 12px 12px;
+  z-index: 1;
+}
+.patch-footer .actions {
+  margin-top: 0;
+}
+.msg.user.abandoned {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
 .reject-reason {
   margin: 4px 0 0 26px;
   width: calc(100% - 26px);
@@ -645,4 +662,24 @@ select {
   header {
     flex-wrap: wrap;
   }
+}
+
+/* 连线后选择极性 */
+.new-edge {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, 32px);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #fff;
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  padding: 6px 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  white-space: nowrap;
+}
+.new-edge .pol {
+  min-width: 34px;
+  font-size: 16px;
 }

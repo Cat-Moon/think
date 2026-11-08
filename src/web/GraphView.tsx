@@ -37,7 +37,8 @@ export interface GraphViewProps {
   readOnly?: boolean;
   /** 连线模式：依次点击两个变量，新增一条关系 */
   connectMode?: boolean;
-  onConnect?: (from: string, to: string) => void;
+  /** rendered：终点变量在画布上的屏幕坐标（用来放极性选择） */
+  onConnect?: (from: string, to: string, rendered: { x: number; y: number }) => void;
   /** 双击空白处（模型坐标和相对画布的屏幕坐标） */
   onCanvasDblClick?: (model: { x: number; y: number }, rendered: { x: number; y: number }) => void;
   /** 有关系穿过变量或互相重叠时（已有变量不会自动移动），提示重新布局 */
@@ -47,6 +48,9 @@ export interface GraphViewProps {
 }
 
 const MAX_FIT_ZOOM = 2.0;
+/** 变量名 14px：缩放不低于 12/14，保证屏幕上不小于 12px（图放不下时可以拖动画布） */
+const NODE_FONT = 14;
+export const MIN_ZOOM = 12 / NODE_FONT;
 const ORANGE = "#dd6b20";
 
 /** 需要提示"重新布局"的问题：边穿过变量、边互相重叠（标签会自动滑开，不提示） */
@@ -63,7 +67,7 @@ export const STYLE: StylesheetJson = [
       label: "data(label)",
       "text-valign": "center",
       "text-halign": "center",
-      "font-size": 14,
+      "font-size": NODE_FONT,
       color: "#1a202c",
       width: "data(w)",
       height: NODE_H,
@@ -238,7 +242,7 @@ export function GraphView(props: GraphViewProps) {
 
   // 创建一次
   useEffect(() => {
-    const cy = cytoscape({ container: container.current, style: STYLE, minZoom: 0.3, maxZoom: 3 });
+    const cy = cytoscape({ container: container.current, style: STYLE, minZoom: MIN_ZOOM, maxZoom: 3 });
     cyRef.current = cy;
     // 新的实例总要缩放一次（开发模式下 StrictMode 会销毁并重建实例）
     needsFit.current = true;
@@ -255,7 +259,7 @@ export function GraphView(props: GraphViewProps) {
           setConnectHint(`起点「${String(e.target.data("label"))}」，再点击终点变量`);
         } else if (from !== id) {
           clearConnect(cy);
-          p.onConnect?.(from, id);
+          p.onConnect?.(from, id, { ...e.target.renderedPosition() });
         }
         return;
       }
@@ -324,7 +328,9 @@ export function GraphView(props: GraphViewProps) {
     placeMarkers(cy, props);
     applyHighlight(cy, props);
     fitIfReady();
-    if (!props.readOnly && Object.keys(pos).some((id) => !props.positions[id])) props.onPositions({ ...props.positions, ...pos });
+    // 新变量有了位置，或重叠的变量被放开、重新找了位置：保存
+    const changed = Object.keys(pos).some((id) => !props.positions[id] || props.positions[id]!.x !== pos[id]!.x || props.positions[id]!.y !== pos[id]!.y);
+    if (!props.readOnly && changed) props.onPositions({ ...props.positions, ...pos });
   }, [props.graph, props.preview, props.accepted, props.showRejected, props.loops, props.positions, props.readOnly]);
 
   // 连线模式开关

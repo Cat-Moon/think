@@ -36,6 +36,7 @@ export const api = {
   saveNotes: (name: string, text: string) => call("PUT", `${m(name)}/notes`, { text }),
   resolve: (name: string, patchId: string, choices: Choices) => call<{ version: string | null }>("POST", `${m(name)}/patches/${patchId}`, { choices }),
   edit: (name: string, ops: PatchOp[], positions?: Record<string, { x: number; y: number }>) => call<{ version: string | null }>("POST", `${m(name)}/edit`, { ops, positions }),
+  abandon: (name: string) => call<{ turn: string }>("POST", `${m(name)}/abandon`),
   restore: (name: string, version: string) => call<{ version: string }>("POST", `${m(name)}/restore`, { version }),
 };
 

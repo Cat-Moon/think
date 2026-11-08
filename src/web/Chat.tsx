@@ -33,8 +33,62 @@ function patchSummary(p: Patch | undefined): string | null {
   return acc === 0 ? "建议已全部拒绝" : `接受了 ${acc} 项${rej ? `，拒绝 ${rej} 项` : ""}`;
 }
 
-export function ChatLog(props: { turns: Turn[]; patches: Patch[]; busy: Busy | null; error: string | null; canRetry: boolean; onRetry: () => void; onCancel: () => void; children?: ReactNode }) {
+/** 一次 AI 回合失败的原因（来自服务端的 done 事件） */
+export interface TurnFailure {
+  kind: string;
+  message: string;
+  resetsAt?: string;
+  violations?: string[];
+}
+
+const hhmm = (iso: string) => {
+  const d = new Date(iso);
+  const today = new Date().toDateString() === d.toDateString();
+  return `${today ? "" : `${d.getMonth() + 1}/${d.getDate()} `}${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
+/** 原因的第一行，截短 */
+const brief = (s: string) => {
+  const line = s.split("\n")[0]!.trim();
+  return line.length > 120 ? `${line.slice(0, 120)}…` : line;
+};
+
+/** 按类型说明失败原因 */
+export function failureText(f: TurnFailure): { title: string; detail?: string } {
+  switch (f.kind) {
+    case "cancelled":
+      return { title: "已取消" };
+    case "timeout":
+      return { title: "超时", detail: "AI 超过 3 分钟没有回复，已停止。" };
+    case "rate_limit":
+      return { title: "额度用完", detail: f.resetsAt ? `订阅额度已用完，约 ${hhmm(f.resetsAt)} 重置。` : "订阅额度已用完或请求过于频繁，请稍后再试。" };
+    case "auth":
+      return { title: "Claude Code 未登录", detail: "请在终端运行 claude 并登录，然后重试。" };
+    case "not_installed":
+      return { title: "找不到 Claude Code CLI", detail: brief(f.message) };
+    case "invalid_output":
+      return { title: "AI 的回复没有通过检查", detail: f.violations?.length ? brief(f.violations.join("；")) : brief(f.message) };
+    default:
+      return { title: "出错了", detail: brief(f.message) };
+  }
+}
+
+export function ChatLog(props: {
+  turns: Turn[];
+  patches: Patch[];
+  busy: Busy | null;
+  error: TurnFailure | null;
+  canRetry: boolean;
+  onRetry: () => void;
+  /** 放弃对话末尾没有回复的消息，把它放回输入框改写 */
+  onAbandon: () => void;
+  onCancel: () => void;
+  /** 待处理的补丁对应的 AI 回合：它的说明和问题显示在建议卡片顶部，这里不重复 */
+  hideTurn?: string | null;
+  children?: ReactNode;
+}) {
   const { turns, patches, busy } = props;
+  const abandoned = new Set(turns.flatMap((t) => (t.abandoned_turn ? [t.abandoned_turn] : [])));
+  const fail = props.error ? failureText(props.error) : null;
   const secs = useSeconds(busy?.startedAt ?? null);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -46,8 +100,8 @@ export function ChatLog(props: { turns: Turn[]; patches: Patch[]; busy: Busy | n
     <div className="chat">
       {turns.length === 0 && !busy && <p className="hint">说一说你想弄明白的现象，AI 会先画一张小的起点图。图里的关系都是假设，由你逐项确认。</p>}
       {turns.map((t) =>
-        t.role === "user" ? (
-          <div key={t.turn_id} className="msg user">
+        t.turn_id === props.hideTurn ? null : t.role === "user" ? (
+          <div key={t.turn_id} className={`msg user${abandoned.has(t.turn_id) ? " abandoned" : ""}`} title={abandoned.has(t.turn_id) ? "已放弃，没有发给 AI 处理" : undefined}>
             {t.text}
           </div>
         ) : t.role === "ai" ? (
@@ -75,14 +129,26 @@ export function ChatLog(props: { turns: Turn[]; patches: Patch[]; busy: Busy | n
           </button>
         </div>
       )}
-      {!busy && (props.error || props.canRetry) && (
+      {!busy && (fail || props.canRetry) && (
         <div className="msg error">
-          {props.error && <p>⚠ {props.error}</p>}
+          {fail ? (
+            <p>
+              <b>⚠ {fail.title}</b>
+              {fail.detail && <>：{fail.detail}</>}
+            </p>
+          ) : (
+            <p>
+              <b>上一条消息还没有得到回复。</b>
+            </p>
+          )}
           {props.canRetry && (
             <p>
               你的消息已保存。
               <button className="primary" onClick={props.onRetry}>
                 重试
+              </button>
+              <button onClick={props.onAbandon} title="这条消息不再发给 AI，放回输入框，可以改写后重发">
+                放弃这条消息
               </button>
             </p>
           )}

@@ -274,6 +274,16 @@ export async function appendTurn(dir: string, turn: Omit<Turn, "turn_id" | "crea
   return full;
 }
 
+/**
+ * 放弃对话末尾那条没有得到回复的用户消息：追加一条 system 回合标记它（对话只追加，不删除）。
+ * 之后不能再对它重试，它也不会发给 AI。
+ */
+export async function abandonLastMessage(dir: string, now: string): Promise<Turn> {
+  const last = (await readConversation(dir)).items.at(-1);
+  if (last?.role !== "user") throw new StorageError("对话末尾没有等待回复的消息");
+  return appendTurn(dir, { role: "system", text: "放弃了上一条消息（没有发给 AI 处理）", abandoned_turn: last.turn_id }, now);
+}
+
 // ---------- 笔记与布局 ----------
 
 export async function readNotes(dir: string): Promise<string> {
