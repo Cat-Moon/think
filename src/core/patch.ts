@@ -76,7 +76,13 @@ export function planDecisions(ops: readonly PatchOp[], choices: Choices): OpDeci
 }
 
 /** 按顺序应用一组操作，返回新的图内容（version 不变）。任何一项不合法都会抛出 PatchError。 */
-export function applyOps(graph: Graph, ops: readonly { index: number; op: PatchOp }[], origin: Origin): Graph {
+export function applyOps(
+  graph: Graph,
+  ops: readonly { index: number; op: PatchOp }[],
+  origin: Origin,
+  /** 可选：记录每项新增操作创建的节点 / 边 ID（操作序号 → ID），用于补丁预览 */
+  trace?: Map<number, string>,
+): Graph {
   const g = structuredClone(graph);
   const refMap = new Map<string, string>();
 
@@ -121,6 +127,7 @@ export function applyOps(graph: Graph, ops: readonly { index: number; op: PatchO
         const id = nextItemId("n", g.nodes);
         g.nodes.push({ id, label: op.label.trim(), status: "accepted", origin, note: "" });
         refMap.set(op.ref, id);
+        trace?.set(i, id);
         break;
       }
       case "update_node": {
@@ -160,8 +167,10 @@ export function applyOps(graph: Graph, ops: readonly { index: number; op: PatchO
         const to = liveNode(op.to, i);
         if (from.id === to.id) throw new PatchError(`关系不能从"${from.label}"指向自己`, i);
         assertNoActiveEdge(from.id, to.id, null, i);
+        const edgeId = nextItemId("e", g.edges);
+        trace?.set(i, edgeId);
         g.edges.push({
-          id: nextItemId("e", g.edges),
+          id: edgeId,
           from: from.id,
           to: to.id,
           polarity: op.polarity,

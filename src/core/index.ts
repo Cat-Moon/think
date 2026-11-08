@@ -7,3 +7,4 @@ export * from "./patch";
 export * from "./describe";
 export * from "./ai-context";
 export * from "./ai-check";
+export * from "./preview";
